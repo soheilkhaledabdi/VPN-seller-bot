@@ -1,5 +1,5 @@
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import sqlite3
 
 # Create database connection
@@ -14,13 +14,26 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS users (
 cursor.execute('''CREATE TABLE IF NOT EXISTS licenses (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     license_key TEXT,
-                    status TEXT)''')
+                    status TEXT,
+                    purchase_id INTEGER)''')
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS purchases (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     chat_id INTEGER,
                     license_key TEXT,
-                    status TEXT)''')
+                    status TEXT,
+                    purchase_id INTEGER)''')
+
+try:
+    cursor.execute('ALTER TABLE purchases ADD COLUMN purchase_id INTEGER')
+except sqlite3.OperationalError:
+    pass
+
+# Add purchase_id column to licenses table if it doesn't exist
+try:
+    cursor.execute('ALTER TABLE licenses ADD COLUMN purchase_id INTEGER')
+except sqlite3.OperationalError:
+    pass
 
 conn.commit()
 
@@ -28,7 +41,7 @@ conn.commit()
 API_ID = 29365133
 API_HASH = "722d0eb612a789286c0ed9966c473ddf"
 BOT_TOKEN = "6792619764:AAGmD9A8f1AQ_neJoJmQwdq_FAFwfcz8ZHk"
-ADMIN_IDS = [1734062356,799574527]  # List of admin Telegram numeric IDs
+ADMIN_IDS = [1734062356, 799574527]  # List of admin Telegram numeric IDs
 
 # Initialize Client
 app = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
@@ -36,7 +49,11 @@ app = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 # Dictionary to store user states
 user_states = {}
 
+# Function to send message to admin
+async def send_admin_message(admin_id, message_text, reply_markup=None):
+    await app.send_message(admin_id, message_text, reply_markup=reply_markup)
 
+# Command handlers
 @app.on_message(filters.command("start"))
 async def start(client, message):
     chat_id = message.chat.id
@@ -128,7 +145,7 @@ async def handle_text(client, message):
 
     if user_states.get(chat_id) == "admin_logged_in":
         cursor.execute(
-            "INSERT INTO licenses (license_key, status) VALUES (?, 'set')", (text,))
+            "INSERT INTO licenses (license_key, status, purchase_id) VALUES (?, 'set', NULL)", (text,))
         conn.commit()
         await message.reply_text("کانفیگ جدید اضافه شد➕✅")
 
@@ -136,7 +153,7 @@ async def handle_text(client, message):
         licenses = text.split('\n')
         for license_key in licenses:
             cursor.execute(
-                "INSERT INTO licenses (license_key, status) VALUES (?, 'set')", (license_key,))
+                "INSERT INTO licenses (license_key, status, purchase_id) VALUES (?, 'set', NULL)", (license_key,))
         conn.commit()
         user_states[chat_id] = "admin_logged_in"
         await message.reply_text("کانفیگ‌های جدید اضافه شدند➕✅")
@@ -146,17 +163,19 @@ async def handle_text(client, message):
 async def handle_photo(client, message):
     chat_id = message.chat.id
 
-    if user_states.get(chat_id) == "waiting_for_payment_proof":
+    if user_states.get(chat_id) in ["waiting_for_payment_proof", "resend_payment_proof"]:
         user_states[chat_id] = "awaiting_admin_approval"
         file_id = message.photo.file_id
         await message.reply_text("عکس تایید پرداخت دریافت شد. منتظر تایید ادمین باشید.")
 
-        # Inform admins
         for admin_id in ADMIN_IDS:
-            await client.send_message(admin_id, f"کاربر {chat_id} عکس تایید پرداخت ارسال کرده است. برای تایید، از دستور /approve {chat_id} استفاده کنید.", reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton(
-                    "تایید", callback_data=f"approve_{chat_id}")]
-            ]))
+            await client.send_photo(admin_id, file_id, caption=f"کاربر {chat_id} عکس تایید پرداخت ارسال کرده است. برای تایید، از دستور /approve {chat_id} استفاده کنید.",
+                                    reply_markup=InlineKeyboardMarkup([
+                                        [InlineKeyboardButton(
+                                            "تایید", callback_data=f"approve_{chat_id}")],
+                                        [InlineKeyboardButton(
+                                            "رد", callback_data=f"reject_{chat_id}")]
+                                    ]))
 
 
 @app.on_callback_query(filters.regex("shop"))
@@ -171,114 +190,91 @@ async def shop_callback(client, callback_query):
 
 @app.on_callback_query(filters.regex("list_configs"))
 async def list_configs(client, callback_query):
-    chat_id = callback_query.from_user.id
+    await callback_query.answer()
+    cursor.execute("SELECT license_key, status FROM licenses")
+    licenses = cursor.fetchall()
 
-    if chat_id in ADMIN_IDS:
-        cursor.execute("SELECT license_key, status FROM licenses")
-        licenses = cursor.fetchall()
-
-        if licenses:
-            response = "لیست کانفیگ‌ها:\n"
-            for license in licenses:
-                response += f"کانفیگ: {license[0]} - وضعیت: {license[1]}\n"
-            await callback_query.message.reply_text(response)
-        else:
-            await callback_query.message.reply_text("هیچ کانفیگی وجود ندارد.")
+    if licenses:
+        response = "لیست کانفیگ‌ها:\n"
+        for license in licenses:
+            response += f"کانفیگ: {license[0]} - وضعیت: {license[1]}\n"
+        await callback_query.message.reply_text(response)
     else:
-        await callback_query.message.reply_text("شما دسترسی ادمین ندارید ⛔")
-
-
-@app.on_callback_query(filters.regex("sold_configs"))
-async def sold_configs(client, callback_query):
-    chat_id = callback_query.from_user.id
-
-    if chat_id in ADMIN_IDS:
-        cursor.execute("SELECT license_key FROM licenses WHERE status = 'use'")
-        sold_licenses = cursor.fetchall()
-
-        if sold_licenses:
-            response = "کانفیگ‌های فروش رفته:\n"
-            for license in sold_licenses:
-                response += f"کانفیگ: {license[0]}\n"
-            await callback_query.message.reply_text(response)
-        else:
-            await callback_query.message.reply_text("هیچ کانفیگی فروش نرفته است.")
-    else:
-        await callback_query.message.reply_text("شما دسترسی ادمین ندارید ⛔")
-
-
-@app.on_callback_query(filters.regex("pending_users"))
-async def pending_users(client, callback_query):
-    chat_id = callback_query.from_user.id
-
-    if chat_id in ADMIN_IDS:
-        cursor.execute(
-            "SELECT chat_id, license_key FROM purchases WHERE status = 'pending'")
-        pending_purchases = cursor.fetchall()
-
-        if pending_purchases:
-            response = "کاربران در انتظار تایید:\n"
-            for purchase in pending_purchases:
-                response += f"کاربر: {purchase[0]} - کانفیگ: {purchase[1]}\n"
-            await callback_query.message.reply_text(response)
-        else:
-            await callback_query.message.reply_text("هیچ کاربری در انتظار تایید نیست.")
-    else:
-        await callback_query.message.reply_text("شما دسترسی ادمین ندارید ⛔")
-
-
-@app.on_callback_query(filters.regex("add_config"))
-async def add_config(client, callback_query):
-    chat_id = callback_query.from_user.id
-
-    if chat_id in ADMIN_IDS:
-        user_states[chat_id] = "adding_licenses"
-        await callback_query.message.reply_text("لطفا لیست کانفیگ‌ها را ارسال کنید. هر کانفیگ در یک خط باشد:")
-    else:
-        await callback_query.message.reply_text("شما دسترسی ادمین ندارید ⛔")
+        await callback_query.message.reply_text("هیچ کانفیگی وجود ندارد.")
 
 
 @app.on_callback_query(filters.regex(r"approve_(\d+)"))
-async def approve_purchase(client, callback_query):
+async def approve_payment(client, callback_query):
     admin_id = callback_query.from_user.id
     user_chat_id = int(callback_query.data.split('_')[1])
 
     if admin_id in ADMIN_IDS:
         cursor.execute(
-            "SELECT license_key FROM purchases WHERE chat_id = ? AND status = 'pending'", (user_chat_id,))
-        purchase = cursor.fetchone()
+            "SELECT license_key FROM licenses WHERE status = 'set' AND purchase_id IS NULL LIMIT 1")
+        license = cursor.fetchone()
 
-        if purchase:
-            license_key = purchase[0]
+        if license:
+            license_key = license[0]
             cursor.execute(
-                "UPDATE licenses SET status = 'use' WHERE license_key = ?", (license_key,))
+                "INSERT INTO purchases (chat_id, license_key, status, purchase_id) VALUES (?, ?, 'active', NULL)", (user_chat_id, license_key))
             cursor.execute(
-                "UPDATE purchases SET status = 'approved' WHERE chat_id = ? AND license_key = ?", (user_chat_id, license_key))
+                "UPDATE licenses SET status = 'sold', purchase_id = last_insert_rowid() WHERE license_key = ?", (license_key,))
             conn.commit()
-
-            await client.send_message(user_chat_id, f"خرید شما تایید شد و کانفیگ به شما اختصاص داده شد: {license_key}")
-            await callback_query.message.reply_text("خرید تایید شد و کانفیگ به کاربر اختصاص داده شد.")
+            await client.send_message(user_chat_id, f"پرداخت شما تایید شد✅. کانفیگ شما: {license_key}")
+            await send_admin_message(admin_id, f"پرداخت کاربر {user_chat_id} تایید شد. کانفیگ: {license_key}")
         else:
-            await callback_query.message.reply_text("خریدی برای تایید پیدا نشد.")
+            await client.send_message(user_chat_id, "پرداخت شما تایید شد اما هیچ کانفیگی موجود نیست. لطفاً با ادمین تماس بگیرید.")
+            await send_admin_message(admin_id, f"پرداخت کاربر {user_chat_id} تایید شد اما هیچ کانفیگی موجود نیست.")
+        
+        await callback_query.message.delete()
     else:
-        await callback_query.message.reply_text("شما دسترسی ادمین ندارید ⛔")
+        await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
 
+
+@app.on_callback_query(filters.regex(r"reject_(\d+)"))
+async def reject_payment(client, callback_query):
+    admin_id = callback_query.from_user.id
+    user_chat_id = int(callback_query.data.split('_')[1])
+
+    if admin_id in ADMIN_IDS:
+        user_states[user_chat_id] = "resend_payment_proof"
+        await send_admin_message(admin_id, f"رد خرید برای کاربر {user_chat_id} انجام شد.")
+        await client.send_message(user_chat_id, "خرید شما توسط ادمین رد شد. برای ارسال مجدد عکس تایید پرداخت، لطفاً دوباره عکس را ارسال کنید.",
+                                  reply_markup=InlineKeyboardMarkup([
+                                      [InlineKeyboardButton(
+                                          "ارسال مجدد عکس تایید پرداخت", callback_data="resend_photo")]
+                                  ]))
+        
+        await callback_query.message.delete()
+    else:
+        await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
+
+
+@app.on_callback_query(filters.regex("resend_photo"))
+async def resend_photo(client, callback_query):
+    chat_id = callback_query.from_user.id
+    user_states[chat_id] = "resend_payment_proof"
+
+    await callback_query.message.reply_text(
+        "لطفاً عکس تایید پرداخت را دوباره ارسال کنید."
+    )
 
 @app.on_callback_query(filters.regex("my_configs"))
 async def my_configs(client, callback_query):
     chat_id = callback_query.from_user.id
 
     cursor.execute(
-        "SELECT license_key FROM purchases WHERE chat_id = ? AND status = 'approved'", (chat_id,))
-    configs = cursor.fetchall()
+        "SELECT license_key FROM purchases WHERE chat_id = ?", (chat_id,))
+    purchases = cursor.fetchall()
 
-    if configs:
-        response = "لیست کانفیگ‌های شما:\n"
-        for config in configs:
-            response += f"کانفیگ: {config[0]}\n"
+    if purchases:
+        response = "کانفیگ‌های شما:\n"
+        for purchase in purchases:
+            response += f"- {purchase[0]}\n"
         await callback_query.message.reply_text(response)
     else:
-        await callback_query.message.reply_text("شما هیچ کانفیگ تایید شده‌ای ندارید.")
+        await callback_query.message.reply_text("شما هیچ کانفیگی خریداری نکرده‌اید.")
+
 
 # Run bot
 app.run()
