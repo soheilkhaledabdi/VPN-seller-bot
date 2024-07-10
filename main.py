@@ -24,12 +24,16 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS purchases (
                     status TEXT,
                     purchase_id INTEGER)''')
 
+cursor.execute('''CREATE TABLE IF NOT EXISTS config_files (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    file_id TEXT,
+                    file_name TEXT)''')
+
 try:
     cursor.execute('ALTER TABLE purchases ADD COLUMN purchase_id INTEGER')
 except sqlite3.OperationalError:
     pass
 
-# Add purchase_id column to licenses table if it doesn't exist
 try:
     cursor.execute('ALTER TABLE licenses ADD COLUMN purchase_id INTEGER')
 except sqlite3.OperationalError:
@@ -75,7 +79,9 @@ async def start(client, message):
                                      [InlineKeyboardButton(
                                          "کاربران در انتظار تایید", callback_data="pending_users")],
                                      [InlineKeyboardButton(
-                                         "اضافه کردن کانفیگ", callback_data="add_config")]
+                                         "اضافه کردن کانفیگ", callback_data="add_config")],
+                                     [InlineKeyboardButton(
+                                         "مدیریت فایل‌های کانفیگ", callback_data="manage_configs")]
                                  ]))
     else:
         await message.reply_text("سلام به ربات کانفیگ خوش اومدی:)",
@@ -83,9 +89,10 @@ async def start(client, message):
                                      [InlineKeyboardButton(
                                          "خرید کانفیگ", callback_data="shop")],
                                      [InlineKeyboardButton(
-                                         "مشاهده لیست کانفیگ‌های من", callback_data="my_configs")]
+                                         "مشاهده لیست کانفیگ‌های من", callback_data="my_configs")],
+                                     [InlineKeyboardButton(
+                                         "دانلود فایل‌های کانفیگ", callback_data="download_configs")]
                                  ]))
-
 
 @app.on_message(filters.command("admin"))
 async def admin_login(client, message):
@@ -102,11 +109,12 @@ async def admin_login(client, message):
                                      [InlineKeyboardButton(
                                          "کاربران در انتظار تایید", callback_data="pending_users")],
                                      [InlineKeyboardButton(
-                                         "اضافه کردن کانفیگ", callback_data="add_config")]
+                                         "اضافه کردن کانفیگ", callback_data="add_config")],
+                                     [InlineKeyboardButton(
+                                         "مدیریت فایل‌های کانفیگ", callback_data="manage_configs")]
                                  ]))
     else:
         await message.reply_text("شما ادمین نیستید ⛔")
-
 
 @app.on_message(filters.command("addlicenses") & filters.private)
 async def add_licenses(client, message):
@@ -117,7 +125,6 @@ async def add_licenses(client, message):
         await message.reply_text("لطفا لیست کانفیگ‌ها را ارسال کنید. هر کانفیگ در یک خط باشد:")
     else:
         await message.reply_text("شما دسترسی ادمین ندارید ⛔")
-
 
 @app.on_message(filters.command("getlicenses") & filters.private)
 async def get_licenses(client, message):
@@ -136,7 +143,6 @@ async def get_licenses(client, message):
             await message.reply_text("هیچ کانفیگی وجود ندارد.")
     else:
         await message.reply_text("شما دسترسی ادمین ندارید ⛔")
-
 
 @app.on_message(filters.text & filters.private)
 async def handle_text(client, message):
@@ -158,7 +164,6 @@ async def handle_text(client, message):
         user_states[chat_id] = "admin_logged_in"
         await message.reply_text("کانفیگ‌های جدید اضافه شدند➕✅")
 
-
 @app.on_message(filters.photo & filters.private)
 async def handle_photo(client, message):
     chat_id = message.chat.id
@@ -177,7 +182,6 @@ async def handle_photo(client, message):
                                             "رد", callback_data=f"reject_{chat_id}")]
                                     ]))
 
-
 @app.on_callback_query(filters.regex("shop"))
 async def shop_callback(client, callback_query):
     chat_id = callback_query.from_user.id
@@ -186,7 +190,6 @@ async def shop_callback(client, callback_query):
     await callback_query.message.reply_text(
         "برای خرید کانفیگ مبلغ را به شماره کارت 1234-5678-9876-5432 واریز کنید و عکس تایید پرداخت را ارسال کنید."
     )
-
 
 @app.on_callback_query(filters.regex("list_configs"))
 async def list_configs(client, callback_query):
@@ -201,7 +204,6 @@ async def list_configs(client, callback_query):
         await callback_query.message.reply_text(response)
     else:
         await callback_query.message.reply_text("هیچ کانفیگی وجود ندارد.")
-
 
 @app.on_callback_query(filters.regex(r"approve_(\d+)"))
 async def approve_payment(client, callback_query):
@@ -230,7 +232,6 @@ async def approve_payment(client, callback_query):
     else:
         await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
 
-
 @app.on_callback_query(filters.regex(r"reject_(\d+)"))
 async def reject_payment(client, callback_query):
     admin_id = callback_query.from_user.id
@@ -248,7 +249,6 @@ async def reject_payment(client, callback_query):
         await callback_query.message.delete()
     else:
         await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
-
 
 @app.on_callback_query(filters.regex("resend_photo"))
 async def resend_photo(client, callback_query):
@@ -275,6 +275,81 @@ async def my_configs(client, callback_query):
     else:
         await callback_query.message.reply_text("شما هیچ کانفیگی خریداری نکرده‌اید.")
 
+@app.on_callback_query(filters.regex("manage_configs"))
+async def manage_configs(client, callback_query):
+    chat_id = callback_query.from_user.id
+    if chat_id in ADMIN_IDS:
+        user_states[chat_id] = "managing_configs"
+        await callback_query.message.reply_text("شما وارد بخش مدیریت فایل‌های کانفیگ شدید.\نلطفاً یک فایل کانفیگ ارسال کنید.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton(
+                    "مشاهده لیست فایل‌های کانفیگ", callback_data="view_configs")],
+                [InlineKeyboardButton(
+                    "اضافه کردن فایل کانفیگ", callback_data="add_config_file")]
+            ]))
+    else:
+        await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
+
+@app.on_message(filters.document & filters.private)
+async def handle_document(client, message):
+    chat_id = message.chat.id
+
+    if user_states.get(chat_id) == "managing_configs":
+        file_id = message.document.file_id
+        file_name = message.document.file_name
+
+        cursor.execute(
+            "INSERT INTO config_files (file_id, file_name) VALUES (?, ?)", (file_id, file_name))
+        conn.commit()
+
+        await message.reply_text("فایل کانفیگ با موفقیت اضافه شد✅",
+                                 reply_markup=InlineKeyboardMarkup([
+                                     [InlineKeyboardButton(
+                                         "مشاهده لیست فایل‌های کانفیگ", callback_data="view_configs")]
+                                 ]))
+
+@app.on_callback_query(filters.regex("view_configs"))
+async def view_configs(client, callback_query):
+    chat_id = callback_query.from_user.id
+
+    cursor.execute("SELECT id, file_name FROM config_files")
+    config_files = cursor.fetchall()
+
+    if config_files:
+        buttons = []
+        for config_file in config_files:
+            buttons.append([InlineKeyboardButton(
+                f"{config_file[1]}", callback_data=f"delete_config_{config_file[0]}")])
+        
+        await callback_query.message.reply_text("لیست فایل‌های کانفیگ:",
+                                                reply_markup=InlineKeyboardMarkup(buttons))
+    else:
+        await callback_query.message.reply_text("هیچ فایل کانفیگی وجود ندارد.")
+
+@app.on_callback_query(filters.regex(r"delete_config_(\d+)"))
+async def delete_config(client, callback_query):
+    config_id = int(callback_query.data.split('_')[2])
+    chat_id = callback_query.from_user.id
+
+    if chat_id in ADMIN_IDS:
+        cursor.execute("DELETE FROM config_files WHERE id = ?", (config_id,))
+        conn.commit()
+        await callback_query.message.reply_text("فایل کانفیگ با موفقیت حذف شد❌")
+    else:
+        await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
+
+@app.on_callback_query(filters.regex("download_configs"))
+async def download_configs(client, callback_query):
+    chat_id = callback_query.from_user.id
+
+    cursor.execute("SELECT file_id, file_name FROM config_files")
+    config_files = cursor.fetchall()
+
+    if config_files:
+        for config_file in config_files:
+            await client.send_document(chat_id, config_file[0], caption=config_file[1])
+    else:
+        await callback_query.message.reply_text("هیچ فایل کانفیگی برای دانلود موجود نیست.")
 
 # Run bot
 app.run()
