@@ -45,8 +45,8 @@ conn.commit()
 # Bot token and admin list
 API_ID = 29365133
 API_HASH = "722d0eb612a789286c0ed9966c473ddf"
-BOT_TOKEN = "7236010110:AAGSiXM6kdki26hjhNZ6XoQUWmVUfzWbJxE"
-ADMIN_IDS = [1734062356, 799574527]  # List of admin Telegram numeric IDs
+BOT_TOKEN = "7236010110:AAGLWk26S78HcsGJeykI7Vh4LbNHMI4XT3g"
+ADMIN_IDS = [1734062356, 799574527]
 
 # Initialize Client
 app = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
