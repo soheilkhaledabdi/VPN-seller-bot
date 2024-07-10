@@ -15,27 +15,28 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS licenses (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     license_key TEXT,
                     status TEXT,
+                    chat_id INTEGER,
                     purchase_id INTEGER)''')
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS purchases (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     chat_id INTEGER,
                     license_key TEXT,
-                    status TEXT,
-                    purchase_id INTEGER)''')
+                    status TEXT)''')
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS config_files (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     file_id TEXT,
                     file_name TEXT)''')
 
+# Try to add columns if they don't exist
 try:
-    cursor.execute('ALTER TABLE purchases ADD COLUMN purchase_id INTEGER')
+    cursor.execute('ALTER TABLE licenses ADD COLUMN chat_id INTEGER')
 except sqlite3.OperationalError:
     pass
 
 try:
-    cursor.execute('ALTER TABLE licenses ADD COLUMN purchase_id INTEGER')
+    cursor.execute('ALTER TABLE purchases ADD COLUMN purchase_id INTEGER')
 except sqlite3.OperationalError:
     pass
 
@@ -63,21 +64,20 @@ async def start(client, message):
     chat_id = message.chat.id
     name = message.from_user.first_name
 
-    # Register user
     cursor.execute(
         "INSERT OR IGNORE INTO users (chat_id, name) VALUES (?, ?)", (chat_id, name))
     conn.commit()
-
-    # Send welcome message
+    
     if chat_id in ADMIN_IDS:
-        await message.reply_text("سلام ستونم به ربات مدیریت کانفیگ خوش آمدید.",
+        user_states[chat_id] = "admin_logged_in"
+        await message.reply_text("با موفقیت وارد شدید✅",
                                  reply_markup=InlineKeyboardMarkup([
                                      [InlineKeyboardButton(
                                          "لیست کانفیگ‌ها", callback_data="list_configs")],
                                      [InlineKeyboardButton(
                                          "کانفیگ‌های فروش رفته", callback_data="sold_configs")],
-                                     [InlineKeyboardButton(
-                                         "کاربران در انتظار تایید", callback_data="pending_users")],
+                                    #  [InlineKeyboardButton(
+                                    #      "کاربران در انتظار تایید", callback_data="pending_users")],
                                      [InlineKeyboardButton(
                                          "اضافه کردن کانفیگ", callback_data="add_config")],
                                      [InlineKeyboardButton(
@@ -93,28 +93,6 @@ async def start(client, message):
                                      [InlineKeyboardButton(
                                          "دانلود فایل‌های کانفیگ", callback_data="download_configs")]
                                  ]))
-
-@app.on_message(filters.command("admin"))
-async def admin_login(client, message):
-    chat_id = message.chat.id
-
-    if chat_id in ADMIN_IDS:
-        user_states[chat_id] = "admin_logged_in"
-        await message.reply_text("با موفقیت وارد شدید✅",
-                                 reply_markup=InlineKeyboardMarkup([
-                                     [InlineKeyboardButton(
-                                         "لیست کانفیگ‌ها", callback_data="list_configs")],
-                                     [InlineKeyboardButton(
-                                         "کانفیگ‌های فروش رفته", callback_data="sold_configs")],
-                                     [InlineKeyboardButton(
-                                         "کاربران در انتظار تایید", callback_data="pending_users")],
-                                     [InlineKeyboardButton(
-                                         "اضافه کردن کانفیگ", callback_data="add_config")],
-                                     [InlineKeyboardButton(
-                                         "مدیریت فایل‌های کانفیگ", callback_data="manage_configs")]
-                                 ]))
-    else:
-        await message.reply_text("شما ادمین نیستید ⛔")
 
 @app.on_message(filters.command("addlicenses") & filters.private)
 async def add_licenses(client, message):
@@ -144,18 +122,32 @@ async def get_licenses(client, message):
     else:
         await message.reply_text("شما دسترسی ادمین ندارید ⛔")
 
+
+@app.on_callback_query(filters.regex("sold_configs"))
+async def sold_configs(client, callback_query):
+    chat_id = callback_query.from_user.id
+
+    if chat_id in ADMIN_IDS:
+        cursor.execute("SELECT license_key, chat_id FROM licenses WHERE status = 'sold'")
+        sold_licenses = cursor.fetchall()
+
+        if sold_licenses:
+            response = "کانفیگ‌های فروش رفته:\n"
+            for license_key, user_id in sold_licenses:
+                response += f"کانفیگ: {license_key} - کاربر: {user_id}\n"
+            await callback_query.message.reply_text(response)
+        else:
+            await callback_query.message.reply_text("هیچ کانفیگ فروخته‌شده‌ای وجود ندارد.")
+    else:
+        await callback_query.answer("شما دسترسی ادمین ندارید ⛔", show_alert=True)
+
+
 @app.on_message(filters.text & filters.private)
 async def handle_text(client, message):
     chat_id = message.chat.id
     text = message.text
 
-    if user_states.get(chat_id) == "admin_logged_in":
-        cursor.execute(
-            "INSERT INTO licenses (license_key, status, purchase_id) VALUES (?, 'set', NULL)", (text,))
-        conn.commit()
-        await message.reply_text("کانفیگ جدید اضافه شد➕✅")
-
-    elif user_states.get(chat_id) == "adding_licenses":
+    if user_states.get(chat_id) == "adding_licenses":
         licenses = text.split('\n')
         for license_key in licenses:
             cursor.execute(
@@ -163,6 +155,11 @@ async def handle_text(client, message):
         conn.commit()
         user_states[chat_id] = "admin_logged_in"
         await message.reply_text("کانفیگ‌های جدید اضافه شدند➕✅")
+    elif user_states.get(chat_id) == "admin_logged_in":
+        cursor.execute(
+            "INSERT INTO licenses (license_key, status, purchase_id) VALUES (?, 'set', NULL)", (text,))
+        conn.commit()
+        await message.reply_text("کانفیگ جدید اضافه شد➕✅")
 
 @app.on_message(filters.photo & filters.private)
 async def handle_photo(client, message):
@@ -204,6 +201,15 @@ async def list_configs(client, callback_query):
         await callback_query.message.reply_text(response)
     else:
         await callback_query.message.reply_text("هیچ کانفیگی وجود ندارد.")
+
+@app.on_callback_query(filters.regex("add_config"))
+async def add_config(client, callback_query):
+    chat_id = callback_query.from_user.id
+    if chat_id in ADMIN_IDS:
+        user_states[chat_id] = "adding_licenses"
+        await callback_query.message.reply_text("لطفا لیست کانفیگ‌ها را ارسال کنید. هر کانفیگ در یک خط باشد:")
+    else:
+        await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
 
 @app.on_callback_query(filters.regex(r"approve_(\d+)"))
 async def approve_payment(client, callback_query):
@@ -280,7 +286,7 @@ async def manage_configs(client, callback_query):
     chat_id = callback_query.from_user.id
     if chat_id in ADMIN_IDS:
         user_states[chat_id] = "managing_configs"
-        await callback_query.message.reply_text("شما وارد بخش مدیریت فایل‌های کانفیگ شدید.\نلطفاً یک فایل کانفیگ ارسال کنید.",
+        await callback_query.message.reply_text("شما وارد بخش مدیریت فایل‌های کانفیگ شدید.\nلطفاً یک فایل کانفیگ ارسال کنید.",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton(
                     "مشاهده لیست فایل‌های کانفیگ", callback_data="view_configs")],
@@ -290,10 +296,22 @@ async def manage_configs(client, callback_query):
     else:
         await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
 
+@app.on_callback_query(filters.regex("add_config_file"))
+async def add_config_file(client, callback_query):
+    chat_id = callback_query.from_user.id
+    if chat_id in ADMIN_IDS:
+        user_states[chat_id] = "managing_configs"
+        print('injast')
+        print(user_states[chat_id])
+        await callback_query.message.reply_text("لطفاً فایل کانفیگ مورد نظر را ارسال کنید.")
+    else:
+        await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
+
+
 @app.on_message(filters.document & filters.private)
 async def handle_document(client, message):
     chat_id = message.chat.id
-
+    print(user_states.get(chat_id))
     if user_states.get(chat_id) == "managing_configs":
         file_id = message.document.file_id
         file_name = message.document.file_name
