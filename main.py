@@ -185,7 +185,7 @@ async def shop_callback(client, callback_query):
     user_states[chat_id] = "waiting_for_payment_proof"
 
     await callback_query.message.reply_text(
-        "برای خرید کانفیگ مبلغ را به شماره کارت 1234-5678-9876-5432 واریز کنید و عکس تایید پرداخت را ارسال کنید."
+        "برای خرید کانفیگ مبلغ را به شماره کارت 5892101544569201 به نام فاطمه یزدانی شیری واریز کنید و عکس تایید پرداخت را ارسال کنید."
     )
 
 @app.on_callback_query(filters.regex("list_configs"))
