@@ -46,7 +46,7 @@ conn.commit()
 API_ID = 29365133
 API_HASH = "722d0eb612a789286c0ed9966c473ddf"
 BOT_TOKEN = "7236010110:AAGLWk26S78HcsGJeykI7Vh4LbNHMI4XT3g"
-ADMIN_IDS = [1734062356, 799574527]
+ADMIN_IDS = [1734062356, 799574527,6171236939]
 
 # Initialize Client
 app = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
@@ -286,12 +286,12 @@ async def manage_configs(client, callback_query):
     chat_id = callback_query.from_user.id
     if chat_id in ADMIN_IDS:
         user_states[chat_id] = "managing_configs"
-        await callback_query.message.reply_text("شما وارد بخش مدیریت فایل‌های کانفیگ شدید.\nلطفاً یک فایل کانفیگ ارسال کنید.",
+        await callback_query.message.reply_text("شما وارد بخش مدیریت فایل‌های کانفیگ شدید.\nلطفاً یک فایل OPV ارسال کنید.",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton(
-                    "مشاهده لیست فایل‌های کانفیگ", callback_data="view_configs")],
+                    "مشاهده لیست فایل‌های OPV", callback_data="view_configs")],
                 [InlineKeyboardButton(
-                    "اضافه کردن فایل کانفیگ", callback_data="add_config_file")]
+                    "اضافه کردن فایل OPV", callback_data="add_config_file")]
             ]))
     else:
         await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
