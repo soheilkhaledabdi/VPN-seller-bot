@@ -81,7 +81,7 @@ async def start(client, message):
                                      [InlineKeyboardButton(
                                          "اضافه کردن کانفیگ", callback_data="add_config")],
                                      [InlineKeyboardButton(
-                                         "مدیریت فایل‌های کانفیگ", callback_data="manage_configs")]
+                                         "مدیریت فایل های OVP", callback_data="manage_configs")]
                                  ]))
     else:
         await message.reply_text("سلام به ربات کانفیگ خوش اومدی:)",
@@ -91,7 +91,7 @@ async def start(client, message):
                                      [InlineKeyboardButton(
                                          "مشاهده لیست کانفیگ‌های من", callback_data="my_configs")],
                                      [InlineKeyboardButton(
-                                         "دانلود فایل‌های کانفیگ", callback_data="download_configs")]
+                                         "دانلود فایل‌های OVP", callback_data="download_configs")]
                                  ]))
 
 @app.on_message(filters.command("addlicenses") & filters.private)
@@ -286,12 +286,12 @@ async def manage_configs(client, callback_query):
     chat_id = callback_query.from_user.id
     if chat_id in ADMIN_IDS:
         user_states[chat_id] = "managing_configs"
-        await callback_query.message.reply_text("شما وارد بخش مدیریت فایل‌های کانفیگ شدید.\nلطفاً یک فایل OPV ارسال کنید.",
+        await callback_query.message.reply_text("شما وارد بخش مدیریت فایل‌های کانفیگ شدید.\nلطفاً یک فایل OVP ارسال کنید.",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton(
-                    "مشاهده لیست فایل‌های OPV", callback_data="view_configs")],
+                    "مشاهده لیست فایل‌های OVP", callback_data="view_configs")],
                 [InlineKeyboardButton(
-                    "اضافه کردن فایل OPV", callback_data="add_config_file")]
+                    "اضافه کردن فایل OVP", callback_data="add_config_file")]
             ]))
     else:
         await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
