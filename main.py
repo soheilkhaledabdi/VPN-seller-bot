@@ -394,7 +394,7 @@ async def profile(client, callback_query):
 @app.on_callback_query(filters.regex("referral_link"))
 async def send_referral_link(client, callback_query):
     chat_id = callback_query.from_user.id
-    referral_link = f"https://t.me/soheilkhaledabadibot?start={chat_id}"
+    referral_link = f"https://t.me/PersianFIFIbot?start={chat_id}"
     await callback_query.message.reply_text(
         f"🔗 لینک دعوت شما: \n{referral_link}\n\n"
         "از این لینک استفاده کنید تا دوستان خود را دعوت کنید و از هر خرید آنها ۱۰ هزار تومان دریافت کنید! 💸"
