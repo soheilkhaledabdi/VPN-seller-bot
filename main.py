@@ -6,7 +6,6 @@ import sqlite3
 conn = sqlite3.connect('database.db')
 cursor = conn.cursor()
 
-# Create tables if they don't exist
 cursor.execute('''CREATE TABLE IF NOT EXISTS users (
                     chat_id INTEGER PRIMARY KEY,
                     name TEXT)''')
@@ -49,8 +48,15 @@ CREATE TABLE IF NOT EXISTS v2ray_plans (
 )
 ''')
 
+cursor.execute('''CREATE TABLE IF NOT EXISTS configs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    plan_id INTEGER,
+                    plan_type TEXT,
+                    config_text TEXT,
+                    FOREIGN KEY(plan_id) REFERENCES licenses(id)
+                )''')
 
-# Try to add columns if they don't exist
+
 try:
     cursor.execute('ALTER TABLE licenses ADD COLUMN chat_id INTEGER')
 except sqlite3.OperationalError:
@@ -66,14 +72,15 @@ try:
 except sqlite3.OperationalError:
     pass
 
+try:
+    cursor.execute('''ALTER TABLE licenses
+                  ADD COLUMN plan_type TEXT CHECK(plan_type IN ('openvpn', 'v2ray'))''')
+except sqlite3.OperationalError:
+    pass
+
 conn.commit()
 
-
-def get_db_connection():
-    conn = sqlite3.connect('database.db')
-    cursor = conn.cursor()
-    return conn, cursor
-
+#end database
 
 # Bot token and admin list
 API_ID = 29365133
@@ -82,7 +89,7 @@ BOT_TOKEN = "6792619764:AAGCZpAMMoOwJ6OcZC9cK76qbCHk5ySvDrQ"
 ADMIN_IDS = [1734062356, 799574527, 6171236939]
 
 # Initialize Client
-app = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+app = Client("FIFI shop", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 # Dictionary to store user states
 user_states = {}
@@ -123,8 +130,8 @@ async def start(client, message):
         user_states[chat_id] = "admin_logged_in"
         await message.reply_text("✅ سلام عزیزم به بخش ادمین خوش اومدی از منو های زیر برای مدیریت ربات استفاده بکن!",
                                  reply_markup=InlineKeyboardMarkup([
-                                     [InlineKeyboardButton(
-                                         "📋 لیست کانفیگ‌ها", callback_data="list_configs")],
+                                                                          [InlineKeyboardButton(
+                                         "👨‍💼 پروفایل من", callback_data="profile")],
                                      [InlineKeyboardButton(
                                          "💼 کانفیگ‌های فروش رفته", callback_data="sold_configs")],
                                      [InlineKeyboardButton(
@@ -154,6 +161,185 @@ async def start(client, message):
                                      [InlineKeyboardButton(
                                          "🔗 زیر مجموعه گیری", callback_data="referral_link")]
                                  ]))
+
+
+@app.on_callback_query(filters.regex("sold_configs"))
+async def sold_configs(client, callback_query):
+    chat_id = callback_query.from_user.id
+
+    if chat_id in ADMIN_IDS:
+        cursor.execute(
+            "SELECT license_key, chat_id FROM licenses WHERE status = 'sold'")
+        sold_licenses = cursor.fetchall()
+
+        if sold_licenses:
+            response = "کانفیگ‌های فروش رفته:\n"
+            for license_key, user_id in sold_licenses:
+                response += f"کانفیگ: {license_key} - کاربر: {user_id}\n"
+            await callback_query.message.reply_text(response)
+        else:
+            await callback_query.message.reply_text("هیچ کانفیگ فروخته‌شده‌ای وجود ندارد.")
+    else:
+        await callback_query.answer("شما دسترسی ادمین ندارید ⛔", show_alert=True)
+
+
+@app.on_callback_query(filters.regex("openvpn_config"))
+async def openvpn_config(client, callback_query):
+    chat_id = callback_query.from_user.id
+    if chat_id in ADMIN_IDS:
+        user_states[chat_id] = "admin_logged_in"
+        await client.send_message(
+            chat_id=chat_id,
+            text="مدیریت کانفیگ OpenVPN:",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton(
+                    "➕ اضافه کردن پلن جدید", callback_data="add_plan_openvpn")],
+                [InlineKeyboardButton(
+                    "➕ اضافه کردن کانفیگ OpenVPN", callback_data="add_config_open")]
+            ])
+        )
+    else:
+        await callback_query.answer("⛔ شما دسترسی ادمین ندارید.", show_alert=True)
+
+@app.on_callback_query(filters.regex("add_config_open"))
+async def add_openvpn_config(client, callback_query):
+    chat_id = callback_query.from_user.id
+    if chat_id in ADMIN_IDS:
+        cursor.execute("SELECT id, name FROM openvpn_plans")
+        openvpn_plans = cursor.fetchall()
+
+        buttons = [
+            [InlineKeyboardButton(
+                plan[1], callback_data=f"add_openvpn_plan_{plan[0]}")]
+            for plan in openvpn_plans
+        ]
+
+        user_states[chat_id] = "select_openvpn_plan"
+        await client.send_message(chat_id, "لطفا پلن کانفیگ OpenVPN را انتخاب کنید:", reply_markup=InlineKeyboardMarkup(buttons))
+    else:
+        await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
+
+
+@app.on_callback_query(filters.regex(r"^add_openvpn_plan_\d+$"))
+async def process_openvpn_plan(client, callback_query):
+    chat_id = callback_query.from_user.id
+    
+    if chat_id in ADMIN_IDS:
+        plan_id = int(callback_query.data.split("_")[-1])
+        
+        user_states[chat_id] = {
+            "action": "collect_config",
+            "type" : "openvpn",
+            "plan_id": plan_id
+        }
+        
+        await client.send_message(chat_id, f"کانفیگ ها رو خط به خط وارد بکنید")
+    else:
+        await callback_query.answer("مشکلی به وجود امده با اول دوباره امتحان بکنید بعد با سازنده تماس بگیرید", show_alert=True)
+
+
+@app.on_callback_query(filters.regex("v2ray_config_add"))
+async def add_v2ray_config(client, callback_query):
+    chat_id = callback_query.from_user.id
+    if chat_id in ADMIN_IDS:
+        cursor.execute("SELECT id, name FROM v2ray_plans")
+        v2ray_plans = cursor.fetchall()
+
+        buttons = [
+            [InlineKeyboardButton(
+                plan[1], callback_data=f"add_v2ray_plan_{plan[0]}")]
+            for plan in v2ray_plans
+        ]
+
+        user_states[chat_id] = "select_v2ray_plan"
+        await client.send_message(chat_id, "لطفا پلن کانفیگ V2Ray را انتخاب کنید:", reply_markup=InlineKeyboardMarkup(buttons))
+    else:
+        await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
+
+
+
+@app.on_callback_query(filters.regex(r"^add_v2ray_plan_\d+$"))
+async def process_v2ray_plan(client, callback_query):
+    chat_id = callback_query.from_user.id
+    
+    if chat_id in ADMIN_IDS:
+        plan_id = int(callback_query.data.split("_")[-1])
+        
+        user_states[chat_id] = {
+            "action": "collect_config",
+            "type" : "v2ray",
+            "plan_id": plan_id
+        }
+        
+        await client.send_message(chat_id, f"کانفیگ ها رو خط به خط وارد بکنید")
+    else:
+        await callback_query.answer("مشکلی به وجود امده با اول دوباره امتحان بکنید بعد با سازنده تماس بگیرید", show_alert=True)
+
+@app.on_message(filters.text & filters.private)
+async def handle_private_message(client, message):
+    chat_id = message.chat.id
+    text = message.text
+
+    if chat_id in user_states:
+        state = user_states[chat_id]
+        print(chat_id,user_states)
+        if isinstance(state, dict) and state.get("action") == "collect_config":
+            type_of_plan = state["type"]
+            config_lines = text.strip().split('\n')
+            plan_id = state["plan_id"]
+            
+            try:
+                for config_text in config_lines:
+                    cursor.execute("INSERT INTO configs (plan_id, plan_type, config_text) VALUES (?, ?, ?)",
+                                   (plan_id, type_of_plan, config_text.strip()))
+                conn.commit()
+                
+                await message.reply_text("کانفیگ‌ها با موفقیت اضافه شدند.")
+            except Exception as e:
+                await message.reply_text(f"خطایی در افزودن کانفیگ‌ها رخ داده است: {str(e)}")
+            finally:
+                del user_states[chat_id]
+
+        elif state == "adding_openvpn_plan":
+            plan_name = text
+            cursor.execute("INSERT INTO openvpn_plans (name) VALUES (?)", (plan_name,))
+            conn.commit()
+            del user_states[chat_id]
+            await message.reply_text(f"پلن OpenVPN با نام {plan_name} با موفقیت اضافه شد ✅")
+
+        elif state == "adding_v2ray_plan":
+            plan_name = text
+            cursor.execute("INSERT INTO v2ray_plans (name) VALUES (?)", (plan_name,))
+            conn.commit()
+            del user_states[chat_id]
+            await message.reply_text(f"پلن V2Ray با نام {plan_name} با موفقیت اضافه شد ✅")
+
+        elif state == "adding_wallet_amount":
+            try:
+                amount = float(text.strip())
+                pending_transactions[chat_id] = {"amount": amount}
+                user_states[chat_id] = "awaiting_payment_proof"
+                await message.reply_text("لطفاً عکس واریزی خود را ارسال کنید.")
+            except ValueError:
+                await message.reply_text("لطفاً یک عدد معتبر وارد کنید.")
+
+        elif state == "adding_licenses":
+            licenses = text.split('\n')
+            for license_key in licenses:
+                cursor.execute(
+                    "INSERT INTO licenses (license_key, status, purchase_id) VALUES (?, 'set', NULL)", (license_key,))
+            conn.commit()
+            user_states[chat_id] = "admin_logged_in"
+            await message.reply_text("کانفیگ‌های جدید اضافه شدند➕✅")
+
+        elif state == "admin_logged_in":
+            cursor.execute(
+                "INSERT INTO licenses (license_key, status, purchase_id) VALUES (?, 'set', NULL)", (text,))
+            conn.commit()
+            await message.reply_text("کانفیگ جدید اضافه شد➕✅")
+
+    else:
+        await message.reply_text("درخواست شما نامعتبر است یا در وضعیت مناسب قرار ندارید.")
 
 
 @app.on_callback_query(filters.regex("profile"))
@@ -215,25 +401,6 @@ async def send_referral_link(client, callback_query):
     )
 
 
-@app.on_callback_query(filters.regex("openvpn_config"))
-async def openvpn_config(client, callback_query):
-    chat_id = callback_query.from_user.id
-    if chat_id in ADMIN_IDS:
-        user_states[chat_id] = "admin_logged_in"
-        await client.send_message(
-            chat_id=chat_id,
-            text="مدیریت کانفیگ OpenVPN:",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton(
-                    "➕ اضافه کردن پلن جدید", callback_data="add_openvpn_plan")],
-                [InlineKeyboardButton(
-                    "➕ اضافه کردن کانفیگ OpenVPN", callback_data="add_openvpn_config")]
-            ])
-        )
-    else:
-        await callback_query.answer("⛔ شما دسترسی ادمین ندارید.", show_alert=True)
-
-
 @app.on_callback_query(filters.regex("v2ray_config"))
 async def v2ray_config(client, callback_query):
     chat_id = callback_query.from_user.id
@@ -246,41 +413,19 @@ async def v2ray_config(client, callback_query):
                 [InlineKeyboardButton(
                     "➕ اضافه کردن پلن جدید", callback_data="add_v2ray_plan")],
                 [InlineKeyboardButton(
-                    "➕ اضافه کردن کانفیگ V2Ray", callback_data="add_v2ray_config")]
+                    "➕ اضافه کردن کانفیگ V2Ray", callback_data="v2ray_config_add")]
             ])
         )
     else:
         await callback_query.answer("⛔ شما دسترسی ادمین ندارید.", show_alert=True)
 
 
-@app.on_callback_query(filters.regex("add_openvpn_plan"))
+@app.on_callback_query(filters.regex("add_plan_openvpn"))
 async def add_openvpn_plan(client, callback_query):
     chat_id = callback_query.from_user.id
     if chat_id in ADMIN_IDS:
         user_states[chat_id] = "adding_openvpn_plan"
         await callback_query.message.reply_text("لطفاً نام پلن جدید OpenVPN را وارد کنید:")
-
-
-@app.on_message(filters.private)
-async def handle_private_message(client, message):
-    chat_id = message.chat.id
-    if chat_id in user_states:
-        state = user_states[chat_id]
-
-        if state == "adding_openvpn_plan":
-            plan_name = message.text
-            cursor.execute(
-                "INSERT INTO openvpn_plans (name) VALUES (?)", (plan_name,))
-            conn.commit()
-            del user_states[chat_id]
-            await message.reply_text(f"پلن OpenVPN با نام {plan_name} با موفقیت اضافه شد ✅")
-        elif state == "adding_v2ray_plan":
-            plan_name = message.text
-            cursor.execute(
-                "INSERT INTO v2ray_plans (name) VALUES (?)", (plan_name,))
-            conn.commit()
-            del user_states[chat_id]
-            await message.reply_text(f"پلن V2Ray با نام {plan_name} با موفقیت اضافه شد ✅")
 
 
 @app.on_callback_query(filters.regex("add_v2ray_plan"))
@@ -298,22 +443,6 @@ async def add_amount(client, callback_query):
     print(user_states)
     await callback_query.message.reply_text("لطفاً مقدار مورد نظر کیف پول خود را وارد کنید.")
 
-
-@app.on_message(filters.text & filters.private)
-async def handle_wallet_amount_text(client, message):
-    chat_id = message.chat.id
-    print(f"Received message from {chat_id}: {message.text}")
-    if user_states.get(chat_id) == "adding_wallet_amount":
-        try:
-            print(f"user_states: {user_states}")
-            amount = float(message.text.strip())
-            pending_transactions[chat_id] = {"amount": amount}
-            user_states[chat_id] = "awaiting_payment_proof"
-            print(f"pending_transactions: {pending_transactions}")
-            print(f"user_states after updating: {user_states}")
-            await message.reply_text("لطفاً عکس واریزی خود را ارسال کنید.")
-        except ValueError:
-            await message.reply_text("لطفاً یک عدد معتبر وارد کنید.")
 
 
 @app.on_message(filters.photo & filters.private)
@@ -384,68 +513,6 @@ async def handle_admin_response(client, callback_query):
             user_states[user_id] = None
     else:
         await callback_query.message.reply_text("درخواست پیدا نشد.")
-
-
-@app.on_callback_query(filters.regex("add_openvpn_config"))
-async def add_openvpn_config(client, callback_query):
-    chat_id = callback_query.from_user.id
-    if chat_id in ADMIN_IDS:
-        cursor.execute("SELECT id, name FROM openvpn_plans")
-        openvpn_plans = cursor.fetchall()
-
-        buttons = [
-            [InlineKeyboardButton(
-                plan[1], callback_data=f"add_openvpn_plan_{plan[0]}")]
-            for plan in openvpn_plans
-        ]
-
-        user_states[chat_id] = "select_openvpn_plan"
-        await client.send_message(chat_id, "لطفا پلن کانفیگ OpenVPN را انتخاب کنید:", reply_markup=InlineKeyboardMarkup(buttons))
-    else:
-        await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
-
-
-@app.on_callback_query(filters.regex("add_v2ray_config"))
-async def add_v2ray_config(client, callback_query):
-    chat_id = callback_query.from_user.id
-    if chat_id in ADMIN_IDS:
-        cursor.execute("SELECT id, name FROM v2ray_plans")
-        v2ray_plans = cursor.fetchall()
-
-        buttons = [
-            [InlineKeyboardButton(
-                plan[1], callback_data=f"add_v2ray_plan_{plan[0]}")]
-            for plan in v2ray_plans
-        ]
-
-        user_states[chat_id] = "select_v2ray_plan"
-        await client.send_message(chat_id, "لطفا پلن کانفیگ V2Ray را انتخاب کنید:", reply_markup=InlineKeyboardMarkup(buttons))
-    else:
-        await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
-
-
-@app.on_message(filters.text & filters.private)
-async def handle_text(client, message):
-    chat_id = message.chat.id
-    text = message.text
-
-    if user_states.get(chat_id) == "adding_openvpn_licenses":
-        licenses = text.split('\n')
-        for license_key in licenses:
-            cursor.execute(
-                "INSERT INTO licenses (license_key, status, config_type) VALUES (?, 'set', 'OpenVPN')", (license_key,))
-        conn.commit()
-        user_states[chat_id] = "admin_logged_in"
-        await message.reply_text("کانفیگ‌های جدید OpenVPN اضافه شدند➕✅")
-
-    elif user_states.get(chat_id) == "adding_v2ray_licenses":
-        licenses = text.split('\n')
-        for license_key in licenses:
-            cursor.execute(
-                "INSERT INTO licenses (license_key, status, config_type) VALUES (?, 'set', 'V2Ray')", (license_key,))
-        conn.commit()
-        user_states[chat_id] = "admin_logged_in"
-        await message.reply_text("کانفیگ‌های جدید V2Ray اضافه شدند➕✅")
 
 
 @app.on_callback_query(filters.regex("shop_openvpn"))
@@ -524,45 +591,6 @@ async def get_licenses(client, message):
     else:
         await message.reply_text("شما دسترسی ادمین ندارید ⛔")
 
-
-@app.on_callback_query(filters.regex("sold_configs"))
-async def sold_configs(client, callback_query):
-    chat_id = callback_query.from_user.id
-
-    if chat_id in ADMIN_IDS:
-        cursor.execute(
-            "SELECT license_key, chat_id FROM licenses WHERE status = 'sold'")
-        sold_licenses = cursor.fetchall()
-
-        if sold_licenses:
-            response = "کانفیگ‌های فروش رفته:\n"
-            for license_key, user_id in sold_licenses:
-                response += f"کانفیگ: {license_key} - کاربر: {user_id}\n"
-            await callback_query.message.reply_text(response)
-        else:
-            await callback_query.message.reply_text("هیچ کانفیگ فروخته‌شده‌ای وجود ندارد.")
-    else:
-        await callback_query.answer("شما دسترسی ادمین ندارید ⛔", show_alert=True)
-
-
-@app.on_message(filters.text & filters.private)
-async def handle_text(client, message):
-    chat_id = message.chat.id
-    text = message.text
-
-    if user_states.get(chat_id) == "adding_licenses":
-        licenses = text.split('\n')
-        for license_key in licenses:
-            cursor.execute(
-                "INSERT INTO licenses (license_key, status, purchase_id) VALUES (?, 'set', NULL)", (license_key,))
-        conn.commit()
-        user_states[chat_id] = "admin_logged_in"
-        await message.reply_text("کانفیگ‌های جدید اضافه شدند➕✅")
-    elif user_states.get(chat_id) == "admin_logged_in":
-        cursor.execute(
-            "INSERT INTO licenses (license_key, status, purchase_id) VALUES (?, 'set', NULL)", (text,))
-        conn.commit()
-        await message.reply_text("کانفیگ جدید اضافه شد➕✅")
 
 
 @app.on_message(filters.photo & filters.private)
@@ -781,13 +809,13 @@ async def manage_configs(client, callback_query):
                                                     [InlineKeyboardButton(
                                                         "مشاهده لیست فایل‌های OVP", callback_data="view_configs")],
                                                     [InlineKeyboardButton(
-                                                        "اضافه کردن فایل OVP", callback_data="add_config_file")]
+                                                        "اضافه کردن فایل OVP", callback_data="inster_open_file")]
                                                 ]))
     else:
         await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
 
 
-@app.on_callback_query(filters.regex("add_config_file"))
+@app.on_callback_query(filters.regex("inster_open_file"))
 async def add_config_file(client, callback_query):
     chat_id = callback_query.from_user.id
     if chat_id in ADMIN_IDS:
@@ -862,8 +890,6 @@ async def download_configs(client, callback_query):
             
             if not file_id or not file_name:
                 continue
-            
-            # Send the document
             try:
                 await client.send_document(chat_id, file_id, caption=file_name)
             except Exception as e:
