@@ -500,9 +500,8 @@ async def send_referral_link(client, callback_query):
     chat_id = callback_query.from_user.id
     referral_link = f"https://t.me/PersianFIFIbot?start={chat_id}"
     await callback_query.message.reply_text(
-        f"🔗 لینک دعوت شما: \n{referral_link}\n\n"
-        "از این لینک استفاده کنید تا دوستان خود را دعوت کنید و از هر خرید آنها ۱۰ هزار تومان دریافت کنید! 💸"
-    )
+        f"ابا لینک پایین دوستاتو به ربات دعوت کن و با هر خرید 10,000 تومان بدست بیار💎💸\n\n{referral_link}"
+        )
 
 
 @app.on_callback_query(filters.regex("v2ray_config"))
@@ -546,7 +545,7 @@ async def add_amount(client, callback_query):
     chat_id = callback_query.from_user.id
     user_states[chat_id] = "adding_wallet_amount"
     print(user_states)
-    await callback_query.message.reply_text("لطفاً مقدار مورد نظر کیف پول خود را وارد کنید.")
+    await callback_query.message.reply_text("لطفاً مقدار مورد نظر کیف پول خود را به شماره کارت زیر واریز بکنید و سپس عکس واریزی را ارسال کنید❤️🙏🏻\n1234-5678-9876-5432\nیزدانی")
 
 
 @app.on_message(filters.photo & filters.private)
@@ -648,13 +647,13 @@ async def handle_admin_response(client, callback_query):
         await callback_query.message.reply_text("درخواست پیدا نشد.")
 
 
-@app.on_callback_query(filters.regex("shop_openvpn"))
-async def shop_openvpn(client, callback_query):
+@app.on_callback_query(filters.regex("shop_v2ray"))
+async def shop_v2ray(client, callback_query):
     cursor.execute("""
-        SELECT openvpn_plans.id, openvpn_plans.name, openvpn_plans.price, COUNT(configs.id) AS available_count
-        FROM openvpn_plans
-        LEFT JOIN configs ON openvpn_plans.id = configs.plan_id AND configs.plan_type = 'openvpn' AND configs.status = 'available'
-        GROUP BY openvpn_plans.id
+        SELECT v2ray_plans.id, v2ray_plans.name, v2ray_plans.price, COUNT(configs.id) AS available_count
+        FROM v2ray_plans
+        LEFT JOIN configs ON v2ray_plans.id = configs.plan_id AND configs.plan_type = 'v2ray' AND configs.status = 'available'
+        GROUP BY v2ray_plans.id
     """)
     openvpn_plans = cursor.fetchall()
 
@@ -674,7 +673,7 @@ async def shop_openvpn(client, callback_query):
     buttons.append([InlineKeyboardButton(
             "برگشت به خانه", callback_data="go_home")])
 
-    new_text = "لطفا پلن کانفیگ OpenVPN را انتخاب کنید:"
+    new_text = "لطفا پلن کانفیگ V2ray را انتخاب کنید:"
     if callback_query.message.text != new_text:
         await callback_query.message.edit_text(
             new_text,
@@ -714,7 +713,8 @@ async def process_buy_config_open(client, callback_query):
     else:
         user_states[user_id] = {
             "action": f"awaiting_admin_approval_openvpn_{plan_id}", "plan_id": plan_id}
-        await callback_query.message.reply_text("موجودی کیف پول شما کافی نیست. لطفا عکس واریز را ارسال بکنید یا کیف پول خود را شارژ کنید.")
+        
+        await callback_query.message.reply_text("موجودی کیف پول شما کافی نیست.برای خرید کانفیگ به شماره کارت زیر واریز کنید و عکس پرداخت رو ارسال کنید و یا موجودی کیف پول خود را افزایش دهید❤️🙏🏻\n1234-5678-9876-5432\nیزدانی")
 
 @app.on_callback_query(filters.regex(r"confirm_purchase_openvpn_(\d+)"))
 async def confirm_purchase_openvpn(client, callback_query):
