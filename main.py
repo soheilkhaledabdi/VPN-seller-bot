@@ -500,7 +500,7 @@ async def send_referral_link(client, callback_query):
     chat_id = callback_query.from_user.id
     referral_link = f"https://t.me/PersianFIFIbot?start={chat_id}"
     await callback_query.message.reply_text(
-        f"ابا لینک پایین دوستاتو به ربات دعوت کن و با هر خرید 10,000 تومان بدست بیار💎💸\n\n{referral_link}"
+        f"با لینک زیر دوستاتو به ربات دعوت کن و با هر خرید 10,000 تومان بدست بیار💎💸\n\n{referral_link}"
         )
 
 
