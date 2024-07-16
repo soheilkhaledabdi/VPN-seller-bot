@@ -170,7 +170,7 @@ async def start(client, message):
         await message.reply_text("✅ سلام عزیزم به بخش ادمین خوش اومدی از منو های زیر برای مدیریت ربات استفاده بکن!",
                                  reply_markup=InlineKeyboardMarkup([
                                      [InlineKeyboardButton(
-                                         "پروفایل من 👨‍💼", callback_data="profile")],
+                                         "پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
                                      [InlineKeyboardButton(
                                          "کانفیگ‌های فروش رفته 💼", callback_data="sold_configs")],
                                      [InlineKeyboardButton(
@@ -186,11 +186,11 @@ async def start(client, message):
         await message.reply_text("👋🏻سلام به ربات خودتون خوش اومدید❤️\nاز منو های زیر جهت خرید میتونید استفاده کنید🤗❤️",
                                  reply_markup=InlineKeyboardMarkup([
                                      [InlineKeyboardButton(
-                                         "پروفایل من 👨‍💼", callback_data="profile")],
+                                         "پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
                                      [InlineKeyboardButton(
-                                         "خرید سروریس گیمینگ 🛒", callback_data="shop_openvpn")],
+                                         "🌎 سرویس‌گیمینگ", callback_data="shop_openvpn")],
                                      [InlineKeyboardButton(
-                                         "خرید کانفیگ V2Ray 🛒", callback_data="shop_v2ray")],
+                                         "📱 V2", callback_data="shop_v2ray")],
                                      [InlineKeyboardButton(
                                          "مشاهده لیست کانفیگ‌های من 📄", callback_data="my_configs")],
                                      [InlineKeyboardButton(
@@ -211,7 +211,7 @@ async def start(client, callback_query):
         await callback_query.message.edit_text(
             "✅ سلام عزیزم به بخش ادمین خوش اومدی از منو های زیر برای مدیریت ربات استفاده بکن!",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("پروفایل من 👨‍💼 ", callback_data="profile")],
+                [InlineKeyboardButton("پروفایل من 👩🏼‍💻🧑🏻‍💻 ", callback_data="profile")],
                 [InlineKeyboardButton("کانفیگ‌های فروش رفته 💼", callback_data="sold_configs")],
                 [InlineKeyboardButton("کانفیگ OpenVPN ➕", callback_data="openvpn_config")],
                 [InlineKeyboardButton("کانفیگ V2Ray ➕", callback_data="v2ray_config")],
@@ -224,11 +224,11 @@ async def start(client, callback_query):
             "👋🏻سلام به ربات خودتون خوش اومدید❤️\nاز منو های زیر جهت خرید میتونید استفاده کنید🤗❤️",
             reply_markup=InlineKeyboardMarkup([
                                      [InlineKeyboardButton(
-                                         "پروفایل من 👨‍💼", callback_data="profile")],
+                                         "پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
                                      [InlineKeyboardButton(
-                                         "خرید سروریس گیمینگ 🛒", callback_data="shop_openvpn")],
+                                         "🌎 سرویس‌گیمینگ", callback_data="shop_openvpn")],
                                      [InlineKeyboardButton(
-                                         "خرید کانفیگ V2Ray 🛒", callback_data="shop_v2ray")],
+                                         "📱 V2", callback_data="shop_v2ray")],
                                      [InlineKeyboardButton(
                                          "مشاهده لیست کانفیگ‌های من 📄", callback_data="my_configs")],
                                      [InlineKeyboardButton(
