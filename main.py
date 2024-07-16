@@ -123,7 +123,7 @@ conn.commit()
 # Bot token and admin list
 API_ID = 29365133
 API_HASH = "722d0eb612a789286c0ed9966c473ddf"
-BOT_TOKEN = "7236010110:AAGLWk26S78HcsGJeykI7Vh4LbNHMI4XT3g"
+BOT_TOKEN = "7448692701:AAHKuwrFJlZot86nKm9TWnbqM1fslJ_mRYE"
 ADMIN_IDS = [1734062356, 799574527, 6171236939]
 
 # Initialize Client
@@ -498,7 +498,7 @@ async def profile(client, callback_query):
 @app.on_callback_query(filters.regex("referral_link"))
 async def send_referral_link(client, callback_query):
     chat_id = callback_query.from_user.id
-    referral_link = f"https://t.me/PersianFIFIbot?start={chat_id}"
+    referral_link = f"https://t.me/fifishopbot?start={chat_id}"
     await callback_query.message.reply_text(
         f"با لینک زیر دوستاتو به ربات دعوت کن و با هر خرید 10,000 تومان بدست بیار💎💸\n\n{referral_link}"
         )
