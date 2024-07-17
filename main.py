@@ -125,8 +125,8 @@ conn.commit()
 
 # Bot token and admin list
 API_ID = 29365133
-API_HASH = "722d0eb612a789286c0ed9966c473ddf"
-BOT_TOKEN = "7448692701:AAHKuwrFJlZot86nKm9TWnbqM1fslJ_mRYE"
+API_HASH = "YOUR_SECRET_API_KEY"
+BOT_TOKEN = "YOUR_SECRET_API_KEY"
 ADMIN_IDS = [1734062356, 799574527, 6171236939,5973267660,6171236939,624982815,494197025]
 
 # Initialize Client
@@ -926,7 +926,12 @@ async def confirm_purchase_v2ray(client, callback_query):
             qr.make(fit=True)
             qr_img = qr.make_image(fill_color="black", back_color="white")
 
-            await client.send_photo(user_id, qr_img, caption=f"کانفیگ V2Ray شما:\n{config_text}")
+            qr_bytes = io.BytesIO()
+            qr_img.save(qr_bytes, format="PNG")
+            qr_bytes.seek(0)
+
+
+            await client.send_photo(user_id, qr_bytes, caption=f"کانفیگ V2Ray شما:\n{config_text}")
 
             await callback_query.answer("خرید تایید شد و کانفیگ برای شما ارسال شد.", show_alert=True)
             await client.send_message(user_id, "خرید شما تایید شد و کانفیگ V2Ray برای شما ارسال شد.")
@@ -937,7 +942,6 @@ async def confirm_purchase_v2ray(client, callback_query):
             await callback_query.answer("هیچ کانفیگی برای این پلن موجود نیست.", show_alert=True)
     else:
         await callback_query.answer("خطای ناشناخته رخ داده است.", show_alert=True)
-
 
 def get_plan_price(plan_id, plan_type):
     if plan_type == "v2ray":
@@ -1017,6 +1021,7 @@ async def approve_openvpn_payment(client, callback_query):
 
                     if user_chat_id in user_states:
                         del user_states[user_chat_id]
+                        await callback_query.message.delete()
                 else:
                     await callback_query.answer("هیچ کانفیگی برای این پلن موجود نیست.", show_alert=True)
             except Exception as e:
@@ -1052,6 +1057,7 @@ async def approve_v2ray_payment(client, callback_query):
 
                     if user_chat_id in user_states:
                         del user_states[user_chat_id]
+                        await callback_query.message.delete()
                 else:
                     await callback_query.answer("هیچ کانفیگی برای این پلن موجود نیست.", show_alert=True)
             except Exception as e:
@@ -1114,6 +1120,11 @@ async def approve_payment(client, callback_query):
         await callback_query.message.delete()
     else:
         await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
+
+@app.on_message(filters.video)
+async def get_file_id(client, message):
+    video_file_id = message.video.file_id
+    await message.reply_text(f"Video File ID: {video_file_id}")
 
 
 @app.on_callback_query(filters.regex(r"reject_(\d+)"))
