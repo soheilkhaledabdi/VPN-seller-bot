@@ -1017,6 +1017,7 @@ async def approve_openvpn_payment(client, callback_query):
 
                     if user_chat_id in user_states:
                         del user_states[user_chat_id]
+                        await callback_query.message.delete()
                 else:
                     await callback_query.answer("هیچ کانفیگی برای این پلن موجود نیست.", show_alert=True)
             except Exception as e:
@@ -1052,6 +1053,7 @@ async def approve_v2ray_payment(client, callback_query):
 
                     if user_chat_id in user_states:
                         del user_states[user_chat_id]
+                        await callback_query.message.delete()
                 else:
                     await callback_query.answer("هیچ کانفیگی برای این پلن موجود نیست.", show_alert=True)
             except Exception as e:
