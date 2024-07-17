@@ -276,22 +276,18 @@ async def tutorials_callback(client, callback_query):
 
 @app.on_callback_query(filters.regex("gaming_tutorial"))
 async def gaming_tutorial_callback(client, callback_query):
-    video_paths = ["videos/gaming-android.MOV", "videos/gaming-iphone.MOV"]
-    for video_path in video_paths:
-        if os.path.exists(video_path):
-            with open(video_path, "rb") as video:
-                await callback_query.message.reply_video(video)
-        else:
-            await callback_query.message.reply_text(f"❌ در ارسال ویدیو مشکلی پیش اومده به ادمین بگید")
+    video_file_ids = [
+        {"file_id": "BAACAgQAAxkBAAIHf2aYSH8XGZyLYmivmDgLSUABnqPRAAI9FAACJt7AUBy25RQfmQUsHgQ", "caption": "آموزش سرویس گیمینگ در ایفون"},
+        {"file_id": "BAACAgQAAxkBAAIBSmaYSn3fI-Cxbe104ifOrPXZs1SfAAJDFAACJt7AUN1alOeQ3NrsHgQ", "caption": "آموزش سرویس گیمینگ در اندروید"}
+    ]
+    for video in video_file_ids:
+        await callback_query.message.reply_video(video["file_id"], caption=video["caption"])
 
 @app.on_callback_query(filters.regex("v2_tutorial"))
 async def v2_tutorial_callback(client, callback_query):
-    video_path = "videos/v2.MOV"
-    if os.path.exists(video_path):
-        with open(video_path, "rb") as video:
-            await callback_query.message.reply_video(video)
-    else:
-            await callback_query.message.reply_text(f"❌ در ارسال ویدیو مشکلی پیش اومده به ادمین بگید")
+    video_file_id = "BAACAgQAAxkBAAIHg2aYSTAzo2jpUH-R0dVYQcqF5yAjAAJBFAACJt7AUAYKTFGAyowZHgQ"
+    caption = "آموزش V2 در اندروید"
+    await callback_query.message.reply_video(video_file_id, caption=caption)
 
 @app.on_callback_query(filters.regex("sold_configs"))
 async def sold_configs(client, callback_query):
