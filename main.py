@@ -276,13 +276,13 @@ async def tutorials_callback(client, callback_query):
 
 @app.on_callback_query(filters.regex("gaming_tutorial"))
 async def gaming_tutorial_callback(client, callback_query):
-    video_paths = ["/videos/gaming-android.MOV", "/videos/gaming-iphone.MOV"]
+    video_paths = ["videos/gaming-android.MOV", "videos/gaming-iphone.MOV"]
     for video_path in video_paths:
         if os.path.exists(video_path):
             with open(video_path, "rb") as video:
                 await callback_query.message.reply_video(video)
         else:
-            await callback_query.message.reply_text(f"❌ Video file not found: {video_path}")
+            await callback_query.message.reply_text(f"❌ در ارسال ویدیو مشکلی پیش اومده به ادمین بگید")
 
 @app.on_callback_query(filters.regex("v2_tutorial"))
 async def v2_tutorial_callback(client, callback_query):
@@ -291,7 +291,7 @@ async def v2_tutorial_callback(client, callback_query):
         with open(video_path, "rb") as video:
             await callback_query.message.reply_video(video)
     else:
-        await callback_query.message.reply_text(f"❌ Video file not found: {video_path}")
+            await callback_query.message.reply_text(f"❌ در ارسال ویدیو مشکلی پیش اومده به ادمین بگید")
 
 @app.on_callback_query(filters.regex("sold_configs"))
 async def sold_configs(client, callback_query):
