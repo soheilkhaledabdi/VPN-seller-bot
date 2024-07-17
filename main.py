@@ -808,15 +808,15 @@ async def confirm_purchase_openvpn(client, callback_query):
             await client.send_photo(
                 chat_id=user_id,
                 photo=bio,
-                caption=f"خرید شما موفقیت‌آمیز بود. این هم کانفیگ شما:\n{config_text}"
+                caption=f"خرید شما موفقیت‌آمیز بود.✅ این هم کانفیگ شما:\n`{config_text}`"
             )
 
             del user_states[user_id]
             await callback_query.message.delete()
         else:
-            await callback_query.message.reply_text("متأسفانه هیچ کانفیگ موجودی برای این پلن وجود ندارد.")
+            await callback_query.message.reply_text("متأسفانه هیچ کانفیگ موجودی برای این پلن وجود ندارد.❌")
     else:
-        await callback_query.message.reply_text("تأیید خرید نامعتبر است یا منقضی شده است.")
+        await callback_query.message.reply_text("تأیید خرید نامعتبر است یا منقضی شده است.❌")
 
 
 @app.on_callback_query(filters.regex("shop_openvpn"))
@@ -927,15 +927,15 @@ async def confirm_purchase_v2ray(client, callback_query):
             qr_bytes.seek(0)
 
 
-            await client.send_photo(user_id, qr_bytes, caption=f"کانفیگ V2Ray شما:\n{config_text}")
+            await client.send_photo(user_id, qr_bytes, caption=f"کانفیگ V2Ray شما:\n`{config_text}`")
 
-            await callback_query.answer("خرید تایید شد و کانفیگ برای شما ارسال شد.", show_alert=True)
-            await client.send_message(user_id, "خرید شما تایید شد و کانفیگ V2Ray برای شما ارسال شد.")
+            await callback_query.answer("خرید تایید شد و کانفیگ برای شما ارسال شد.✅", show_alert=True)
+            await client.send_message(user_id, "خرید شما تایید شد و کانفیگ V2Ray برای شما ارسال شد.✅")
 
             if user_id in user_states:
                 del user_states[user_id]
         else:
-            await callback_query.answer("هیچ کانفیگی برای این پلن موجود نیست.", show_alert=True)
+            await callback_query.answer("هیچ کانفیگی برای این پلن موجود نیست.❌", show_alert=True)
     else:
         await callback_query.answer("خطای ناشناخته رخ داده است.", show_alert=True)
 
