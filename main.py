@@ -1,9 +1,12 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.errors import PeerIdInvalid
+
 import sqlite3
 import qrcode
 import io
 from PIL import Image
+import os
 
 
 # Create database connection
@@ -123,7 +126,7 @@ conn.commit()
 # Bot token and admin list
 API_ID = 29365133
 API_HASH = "722d0eb612a789286c0ed9966c473ddf"
-BOT_TOKEN = "7448692701:AAHKuwrFJlZot86nKm9TWnbqM1fslJ_mRYE"
+BOT_TOKEN = "6792619764:AAGCZpAMMoOwJ6OcZC9cK76qbCHk5ySvDrQ"
 ADMIN_IDS = [1734062356, 799574527, 6171236939,5973267660,6171236939,624982815,494197025]
 
 # Initialize Client
@@ -477,7 +480,7 @@ async def handle_private_message(client, message):
                 amount = float(text)
                 pending_transactions[chat_id] = {"amount": amount}
                 user_states[chat_id] = "awaiting_payment_proof"
-                await message.reply_text("لطفاً عکس واریزی خود را ارسال کنید.")
+                await message.reply_text("لطفاً مقدار مورد نظر کیف پول خود را به شماره کارت زیر واریز بکنید و سپس عکس واریزی را ارسال کنید❤️🙏🏻\n1234-5678-9876-5432\nیزدانی")
             except ValueError:
                 await message.reply_text("لطفاً یک عدد معتبر وارد کنید.")
 
@@ -523,7 +526,7 @@ async def profile(client, callback_query):
 
     # Fetch referral count
     cursor.execute(
-        "SELECT COUNT(*) FROM referrals WHERE user_id = ?", (chat_id,))
+        "SELECT COUNT(*) FROM referrals WHERE referrer_id = ?", (chat_id,))
     referral_count = cursor.fetchone()[0]
 
     # Fetch configuration count
@@ -553,8 +556,7 @@ async def send_referral_link(client, callback_query):
     chat_id = callback_query.from_user.id
     referral_link = f"https://t.me/fifishopbot?start={chat_id}"
     await callback_query.message.reply_text(
-        f"با لینک زیر دوستاتو به ربات دعوت کن و با هر خرید 10,000 تومان بدست بیار💎💸\n\n{
-            referral_link}"
+        f"با لینک زیر دوستاتو به ربات دعوت کن و با هر خرید 10,000 تومان بدست بیار💎💸\n\n{referral_link}"
     )
 
 
@@ -599,7 +601,8 @@ async def add_amount(client, callback_query):
     chat_id = callback_query.from_user.id
     user_states[chat_id] = "adding_wallet_amount"
     print(user_states)
-    await callback_query.message.reply_text("لطفاً مقدار مورد نظر کیف پول خود را به شماره کارت زیر واریز بکنید و سپس عکس واریزی را ارسال کنید❤️🙏🏻\n1234-5678-9876-5432\nیزدانی")
+    await callback_query.message.reply_text("لطفا مبلغ مورد نیاز خود را به تومان وارد بکنید")
+    # await callback_query.message.reply_text("لطفاً مقدار مورد نظر کیف پول خود را به شماره کارت زیر واریز بکنید و سپس عکس واریزی را ارسال کنید❤️🙏🏻\n1234-5678-9876-5432\nیزدانی")
 
 
 @app.on_message(filters.photo & filters.private)
@@ -607,6 +610,8 @@ async def handle_wallet_amount_photo(client, message):
     chat_id = message.chat.id
     state = user_states[chat_id]
 
+    
+    print(state)
     if user_states.get(chat_id) == "awaiting_payment_proof":
         photo_id = message.photo.file_id
         pending_transactions[chat_id]["photo_id"] = photo_id
@@ -618,8 +623,7 @@ async def handle_wallet_amount_photo(client, message):
                 await client.send_photo(
                     chat_id=admin_id,
                     photo=photo_id,
-                    caption=f"کاربر {chat_id} درخواست افزودن {
-                        pending_transactions[chat_id]['amount']} به کیف پول را دارد.",
+                    caption=f"کاربر {chat_id} درخواست افزودن {pending_transactions[chat_id]['amount']} به کیف پول را دارد.",
                     reply_markup=InlineKeyboardMarkup([
                         [InlineKeyboardButton(
                             "تایید", callback_data=f"confirm_{chat_id}")],
@@ -642,10 +646,8 @@ async def handle_wallet_amount_photo(client, message):
         for admin_id in ADMIN_IDS:
             await client.send_photo(admin_id, file_id, caption=f"کاربر {chat_id} عکس تایید پرداخت OpenVPN پلن {plan_type} ارسال کرده است. برای تایید، از دستور /approve_openvpn_{chat_id}_{plan_type} استفاده کنید.",
                                     reply_markup=InlineKeyboardMarkup([
-                                        [InlineKeyboardButton("تایید", callback_data=f"approve_openvpn_{
-                                                              chat_id}_{plan_type}")],
-                                        [InlineKeyboardButton("رد", callback_data=f"reject_openvpn_{
-                                                              chat_id}_{plan_type}")]
+                                        [InlineKeyboardButton("تایید", callback_data=f"approve_openvpn_{chat_id}_{plan_type}")],
+                                        [InlineKeyboardButton("رد", callback_data=f"reject_openvpn_{chat_id}_{plan_type}")]
                                     ]))
     elif isinstance(state, dict) and state.get("action").startswith('awaiting_admin_approval_v2ray_'):
         plan_type = state.get("action").split("_")[-1]
@@ -654,12 +656,10 @@ async def handle_wallet_amount_photo(client, message):
         await message.reply_text("عکس تایید پرداخت V2ray دریافت شد. منتظر تایید ادمین باشید.")
 
         for admin_id in ADMIN_IDS:
-            await client.send_photo(admin_id, file_id, caption=f"کاربر {chat_id} عکس تایید پرداخت V2ray پلن {plan_type} ارسال کرده است. برای تایید، از دستور /approve_openvpn_{chat_id}_{plan_type} استفاده کنید.",
+            await client.send_photo(admin_id, file_id, caption=f"کاربر {chat_id} عکس تایید پرداخت V2ray پلن {plan_type} ارسال کرده است. برای تایید، از دستور /approve_v2ray_{chat_id}_{plan_type} استفاده کنید.",
                                     reply_markup=InlineKeyboardMarkup([
-                                        [InlineKeyboardButton("تایید", callback_data=f"approve_v2ray_{
-                                                              chat_id}_{plan_type}")],
-                                        [InlineKeyboardButton("رد", callback_data=f"reject_v2ray_{
-                                                              chat_id}_{plan_type}")]
+                                        [InlineKeyboardButton("تایید", callback_data=f"approve_v2ray_{chat_id}_{plan_type}")],
+                                        [InlineKeyboardButton("رد", callback_data=f"reject_v2ray_{chat_id}_{plan_type}")]
                                     ]))
 
     else:
@@ -720,7 +720,7 @@ async def shop_v2ray(client, callback_query):
         plan_id, plan_name, plan_price, available_count = plan
         if available_count > 0:
             button_text = f"{plan_name} - {plan_price} تومان (موجود)"
-            callback_data = f"shop_plan_openvpn_{plan_id}"
+            callback_data = f"shop_plan_v2ray_{plan_id}"
         else:
             button_text = f"{plan_name} - {plan_price} تومان (ناموجود)"
             callback_data = f"disabled_{plan_id}"
@@ -760,8 +760,7 @@ async def process_buy_config_open(client, callback_query):
             "action": f"confirm_purchase_openvpn_{plan_id}", "plan_id": plan_id, "plan_price": plan_price}
 
         await callback_query.message.reply_text(
-            f"موجودی کیف پول شما کافی است. آیا مایل به خرید این پلن با قیمت {
-                plan_price} تومان هستید؟",
+            f"موجودی کیف پول شما کافی است. آیا مایل به خرید این پلن با قیمت {plan_price} تومان هستید؟",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton(
                     "بله", callback_data=f"confirm_purchase_openvpn_{plan_id}")],
@@ -814,8 +813,7 @@ async def confirm_purchase_openvpn(client, callback_query):
             await client.send_photo(
                 chat_id=user_id,
                 photo=bio,
-                caption=f"خرید شما موفقیت‌آمیز بود. این هم کانفیگ شما:\n{
-                    config_text}"
+                caption=f"خرید شما موفقیت‌آمیز بود. این هم کانفیگ شما:\n{config_text}"
             )
 
             del user_states[user_id]
@@ -867,7 +865,7 @@ async def disabled_button(client, callback_query):
 
 
 @app.on_callback_query(filters.regex(r"shop_plan_v2ray_(\d+)"))
-async def process_buy_config_open(client, callback_query):
+async def process_buy_config_v2ray(client, callback_query):
     user_id = callback_query.from_user.id
     plan_id = int(callback_query.data.split('_')[-1])
 
@@ -891,7 +889,7 @@ async def process_buy_config_open(client, callback_query):
     else:
         user_states[user_id] = {
             "action": f"awaiting_admin_approval_v2ray_{plan_id}", "plan_id": plan_id}
-        await callback_query.message.reply_text("موجودی کیف پول شما کافی نیست. لطفا عکس واریز را ارسال بکنید یا کیف پول خود را شارژ کنید.")
+        await callback_query.message.reply_text("موجودی کیف پول شما کافی نیست.برای خرید کانفیگ به شماره کارت زیر واریز کنید و عکس پرداخت رو ارسال کنید و یا موجودی کیف پول خود را افزایش دهید❤️🙏🏻\n1234-5678-9876-5432\nیزدانی")
 
 
 @app.on_callback_query(filters.regex(r"confirm_purchase_v2ray_(\d+)"))
@@ -918,7 +916,6 @@ async def confirm_purchase_v2ray(client, callback_query):
                 "UPDATE configs SET status = 'sold' WHERE id = ?", (config_id,))
             conn.commit()
 
-            # Generate QR Code
             qr = qrcode.QRCode(
                 version=1,
                 error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -998,67 +995,72 @@ async def approve_openvpn_payment(client, callback_query):
     admin_id = callback_query.from_user.id
     user_chat_id = int(callback_query.data.split('_')[2])
     plan_id = int(callback_query.data.split('_')[3])
-    if admin_id in ADMIN_IDS:
-        try:
-            cursor.execute("SELECT id, config_text FROM configs WHERE plan_id = ? AND plan_type = ? AND status = 'available' LIMIT 1",
-                           (plan_id, 'openvpn'))
+    if(user_chat_id in user_states):
+        if admin_id in ADMIN_IDS:
+            try:
+                cursor.execute("SELECT id, config_text FROM configs WHERE plan_id = ? AND plan_type = ? AND status = 'available' LIMIT 1",
+                            (plan_id, 'openvpn'))
 
-            config_row = cursor.fetchone()
+                config_row = cursor.fetchone()
 
-            if config_row:
-                config_id, config_text = config_row
+                if config_row:
+                    config_id, config_text = config_row
 
-                cursor.execute(
-                    "UPDATE configs SET status = 'sold' WHERE id = ?", (config_id,))
-                conn.commit()
+                    cursor.execute(
+                        "UPDATE configs SET status = 'sold' WHERE id = ?", (config_id,))
+                    conn.commit()
 
-                await client.send_message(user_chat_id, config_text)
+                    await client.send_message(user_chat_id, config_text)
 
-                await callback_query.answer("پرداخت تایید شد و کانفیگ برای کاربر ارسال شد.", show_alert=True)
-                await client.send_message(user_chat_id, "پرداخت شما تایید شد و کانفیگ OpenVPN برای شما ارسال شد.")
+                    await callback_query.answer("پرداخت تایید شد و کانفیگ برای کاربر ارسال شد.", show_alert=True)
+                    await client.send_message(user_chat_id, "پرداخت شما تایید شد و کانفیگ OpenVPN برای شما ارسال شد.")
 
-                if user_chat_id in user_states:
-                    del user_states[user_chat_id]
-            else:
-                await callback_query.answer("هیچ کانفیگی برای این پلن موجود نیست.", show_alert=True)
-        except Exception as e:
-            await callback_query.answer(f"خطایی رخ داد: {str(e)}", show_alert=True)
-    else:
-        await callback_query.answer("شما اجازه این کار را ندارید.", show_alert=True)
+                    if user_chat_id in user_states:
+                        del user_states[user_chat_id]
+                else:
+                    await callback_query.answer("هیچ کانفیگی برای این پلن موجود نیست.", show_alert=True)
+            except Exception as e:
+                await callback_query.answer(f"خطایی رخ داد: {str(e)}", show_alert=True)
+        else:
+            await callback_query.answer("شما اجازه این کار را ندارید.", show_alert=True)
 
 
 @app.on_callback_query(filters.regex(r"approve_v2ray_(\d+)_(\d+)"))
-async def approve_openvpn_payment(client, callback_query):
+async def approve_v2ray_payment(client, callback_query):
     admin_id = callback_query.from_user.id
     user_chat_id = int(callback_query.data.split('_')[2])
     plan_id = int(callback_query.data.split('_')[3])
-    if admin_id in ADMIN_IDS:
-        try:
-            cursor.execute("SELECT id, config_text FROM configs WHERE plan_id = ? AND plan_type = ? AND status = 'available' LIMIT 1",
-                           (plan_id, 'v2ray'))
+    if(user_chat_id in user_states):
+        if admin_id in ADMIN_IDS:
+            try:
+                cursor.execute("SELECT id, config_text FROM configs WHERE plan_id = ? AND plan_type = ? AND status = 'available' LIMIT 1",
+                            (plan_id, 'v2ray'))
 
-            config_row = cursor.fetchone()
+                config_row = cursor.fetchone()
 
-            if config_row:
-                config_id, config_text = config_row
+                if config_row:
+                    config_id, config_text = config_row
 
-                cursor.execute(
-                    "UPDATE configs SET status = 'sold' WHERE id = ?", (config_id,))
-                conn.commit()
+                    cursor.execute(
+                        "UPDATE configs SET status = 'sold' WHERE id = ?", (config_id,))
+                    conn.commit()
 
-                await client.send_message(user_chat_id, config_text)
+                    await client.send_message(user_chat_id, config_text)
 
-                await callback_query.answer("پرداخت تایید شد و کانفیگ برای کاربر ارسال شد.", show_alert=True)
-                await client.send_message(user_chat_id, "پرداخت شما تایید شد و کانفیگ V2ray برای شما ارسال شد.")
+                    await callback_query.answer("پرداخت تایید شد و کانفیگ برای کاربر ارسال شد.", show_alert=True)
+                    await client.send_message(user_chat_id, "پرداخت شما تایید شد و کانفیگ V2ray برای شما ارسال شد.")
 
-                if user_chat_id in user_states:
-                    del user_states[user_chat_id]
-            else:
-                await callback_query.answer("هیچ کانفیگی برای این پلن موجود نیست.", show_alert=True)
-        except Exception as e:
-            await callback_query.answer(f"خطایی رخ داد: {str(e)}", show_alert=True)
+                    if user_chat_id in user_states:
+                        del user_states[user_chat_id]
+                else:
+                    await callback_query.answer("هیچ کانفیگی برای این پلن موجود نیست.", show_alert=True)
+            except Exception as e:
+                await callback_query.answer(f"خطایی رخ داد: {str(e)}", show_alert=True)
+        else:
+            await callback_query.answer("شما اجازه این کار را ندارید.", show_alert=True)
     else:
-        await callback_query.answer("شما اجازه این کار را ندارید.", show_alert=True)
+        await callback_query.answer("عملیات یا تایید یا رد شده توسط فرد دیگیری با منقضی شده.", show_alert=True)
+        
 
 
 @app.on_callback_query(filters.regex("list_configs"))
