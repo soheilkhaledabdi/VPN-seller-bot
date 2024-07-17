@@ -816,6 +816,7 @@ async def confirm_purchase_openvpn(client, callback_query):
             )
 
             del user_states[user_id]
+            await callback_query.message.delete()
         else:
             await callback_query.message.reply_text("متأسفانه هیچ کانفیگ موجودی برای این پلن وجود ندارد.")
     else:
