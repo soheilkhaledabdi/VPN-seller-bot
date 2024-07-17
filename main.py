@@ -602,7 +602,6 @@ async def add_amount(client, callback_query):
     user_states[chat_id] = "adding_wallet_amount"
     print(user_states)
     await callback_query.message.reply_text("لطفا مبلغ مورد نیاز خود را به تومان وارد بکنید")
-    # await callback_query.message.reply_text("لطفاً مقدار مورد نظر کیف پول خود را به شماره کارت زیر واریز بکنید و سپس عکس واریزی را ارسال کنید❤️🙏🏻\n1234-5678-9876-5432\nیزدانی")
 
 
 @app.on_message(filters.photo & filters.private)
