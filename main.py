@@ -1,3 +1,7 @@
+# Create by soheil khaledabadi 
+# Github   : https://github.com/soheilkhaledabdi
+# Telegram : @soheilkhaledabadi
+
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
