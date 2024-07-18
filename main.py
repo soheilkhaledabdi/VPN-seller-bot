@@ -250,6 +250,18 @@ async def start(client, message):
         )
 
 
+@app.on_message(filters.command("download_db") & filters.private)
+async def send_database(client, message):
+    chat_id = message.chat.id
+    if chat_id in ADMIN_IDS:
+        try:
+            await client.send_document(chat_id, "database.db")
+            await message.reply_text("فایل دیتابیس ارسال شد.")
+        except Exception as e:
+            await message.reply_text(f"خطایی رخ داد: {str(e)}")
+    else:
+        await message.reply_text("شما اجازه این کار را ندارید ⛔")
+
 @app.on_message(filters.contact & filters.private)
 async def contact(client, message):
     global message_to_delete  # Use the global variable
