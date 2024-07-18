@@ -1,5 +1,6 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from dotenv import load_dotenv
 import sqlite3
 import qrcode
 import io
@@ -123,12 +124,32 @@ conn.commit()
 ADMIN_IDS = [1734062356, 799574527, 6171236939,5973267660,6171236939,624982815,494197025]
 
 
-app = Client(
-            os.getenv("BOT_NAME")
-            ,api_id=os.getenv("API_ID")
-            ,api_hash=os.getenv('API_HASH')
-            ,bot_token=os.getenv("BOT_TOKEN"))
+load_dotenv()
 
+
+# Retrieve environment variables with default values
+bot_name = os.getenv("BOT_NAME", "default_bot_name")
+api_id = os.getenv("API_ID")
+api_hash = os.getenv("API_HASH")
+bot_token = os.getenv("BOT_TOKEN")
+
+# Debugging: Print the values to ensure they are set correctly
+print(f"BOT_NAME: {bot_name}")
+print(f"API_ID: {api_id}")
+print(f"API_HASH: {api_hash}")
+print(f"BOT_TOKEN: {bot_token}")
+
+# Check if any of the critical environment variables are None
+if None in (bot_name, api_id, api_hash, bot_token):
+    raise ValueError("One or more environment variables are not set correctly.")
+
+# Initialize the Pyrogram Client
+app = Client(
+    bot_name,
+    api_id=api_id,
+    api_hash=api_hash,
+    bot_token=bot_token
+)
 
 # Dictionary to store user states
 user_states = {}
