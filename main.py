@@ -409,12 +409,18 @@ async def openvpn_config(client, callback_query):
 async def add_openvpn_config(client, callback_query):
     chat_id = callback_query.from_user.id
     if chat_id in ADMIN_IDS:
-        cursor.execute("SELECT id, name FROM openvpn_plans")
+        cursor.execute("""
+            SELECT openvpn_plans.id, openvpn_plans.name, COUNT(configs.id) as available_count
+            FROM openvpn_plans
+            LEFT JOIN configs ON openvpn_plans.id = configs.plan_id AND configs.plan_type = 'openvpn' AND configs.status = 'available'
+            GROUP BY openvpn_plans.id, openvpn_plans.name
+        """)
         openvpn_plans = cursor.fetchall()
 
         buttons = [
             [InlineKeyboardButton(
-                plan[1], callback_data=f"add_openvpn_plan_{plan[0]}")]
+                f"{plan[1]} ({plan[2]})", callback_data=f"add_openvpn_plan_{plan[0]}")
+            ]
             for plan in openvpn_plans
         ]
 
@@ -422,7 +428,6 @@ async def add_openvpn_config(client, callback_query):
         await client.send_message(chat_id, "لطفا پلن کانفیگ OpenVPN را انتخاب کنید:", reply_markup=InlineKeyboardMarkup(buttons))
     else:
         await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
-
 
 @app.on_callback_query(filters.regex(r"^add_openvpn_plan_\d+$"))
 async def process_openvpn_plan(client, callback_query):
@@ -442,16 +447,22 @@ async def process_openvpn_plan(client, callback_query):
         await callback_query.answer("مشکلی به وجود امده با اول دوباره امتحان بکنید بعد با سازنده تماس بگیرید", show_alert=True)
 
 
-@app.on_callback_query(filters.regex("v2ray_config_add"))
+`@app.on_callback_query(filters.regex("v2ray_config_add"))
 async def add_v2ray_config(client, callback_query):
     chat_id = callback_query.from_user.id
     if chat_id in ADMIN_IDS:
-        cursor.execute("SELECT id, name FROM v2ray_plans")
+        cursor.execute("""
+            SELECT v2ray_plans.id, v2ray_plans.name, COUNT(configs.id) as available_count
+            FROM v2ray_plans
+            LEFT JOIN configs ON v2ray_plans.id = configs.plan_id AND configs.plan_type = 'v2ray' AND configs.status = 'available'
+            GROUP BY v2ray_plans.id, v2ray_plans.name
+        """)
         v2ray_plans = cursor.fetchall()
 
         buttons = [
             [InlineKeyboardButton(
-                plan[1], callback_data=f"add_v2ray_plan_{plan[0]}")]
+                f"{plan[1]} ({plan[2]})", callback_data=f"add_v2ray_plan_{plan[0]}")
+            ]
             for plan in v2ray_plans
         ]
 
