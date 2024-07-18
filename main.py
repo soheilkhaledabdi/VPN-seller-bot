@@ -447,7 +447,7 @@ async def process_openvpn_plan(client, callback_query):
         await callback_query.answer("مشکلی به وجود امده با اول دوباره امتحان بکنید بعد با سازنده تماس بگیرید", show_alert=True)
 
 
-`@app.on_callback_query(filters.regex("v2ray_config_add"))
+@app.on_callback_query(filters.regex("v2ray_config_add"))
 async def add_v2ray_config(client, callback_query):
     chat_id = callback_query.from_user.id
     if chat_id in ADMIN_IDS:
