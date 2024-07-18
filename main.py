@@ -362,6 +362,16 @@ async def tutorials_callback(client, callback_query):
         ])
     )
 
+@app.on_callback_query(filters.regex("tutorials"))
+async def tutorials_callback(client, callback_query):
+    await callback_query.message.reply_text(
+        "📚 لطفاً نوع آموزش مورد نظر خود را انتخاب کنید:",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("گیمینگ 🎮", callback_data="gaming_tutorial")],
+            [InlineKeyboardButton("آموزش سرویس V2ray 📲", callback_data="v2_tutorial")]
+        ])
+    )
+
 @app.on_callback_query(filters.regex("gaming_tutorial"))
 async def gaming_tutorial_callback(client, callback_query):
     keyboard = InlineKeyboardMarkup([
@@ -372,19 +382,15 @@ async def gaming_tutorial_callback(client, callback_query):
 
 @app.on_callback_query(filters.regex("android_gaming_tutorial"))
 async def android_gaming_tutorial_callback(client, callback_query):
-    video_file_ids = [
-        {"file_id": "BAACAgQAAxkBAAMtZpmVY6XhfYC-No1ccchUQTAQ1tYAAsgVAAJav8lQzXrVSPugrOoeBA", "caption": "آموزش سرویس گیمینگ در اندروید"}
-    ]
-    for video in video_file_ids:
-        await callback_query.message.reply_video(video["file_id"], caption=video["caption"])
+    video_file_id = "BAACAgQAAxkBAAMtZpmVY6XhfYC-No1ccchUQTAQ1tYAAsgVAAJav8lQzXrVSPugrOoeBA"
+    caption = "آموزش سرویس گیمینگ در اندروید"
+    await callback_query.message.reply_video(video_file_id, caption=caption)
 
 @app.on_callback_query(filters.regex("iphone_gaming_tutorial"))
 async def iphone_gaming_tutorial_callback(client, callback_query):
-    video_file_ids = [
-        {"file_id": "BAACAgQAAxkBAAMvZpmVpJgF40_xwmSvmUnClGc9TT8AAkMUAAIm3sBQFr8LhMvQ5koeBA", "caption": "آموزش سرویس گیمینگ در ایفون"}
-    ]
-    for video in video_file_ids:
-        await callback_query.message.reply_video(video["file_id"], caption=video["caption"])
+    video_file_id = "BAACAgQAAxkBAAMvZpmVpJgF40_xwmSvmUnClGc9TT8AAkMUAAIm3sBQFr8LhMvQ5koeBA"
+    caption = "آموزش سرویس گیمینگ در ایفون"
+    await callback_query.message.reply_video(video_file_id, caption=caption)
 
 
 @app.on_callback_query(filters.regex("v2_tutorial"))
