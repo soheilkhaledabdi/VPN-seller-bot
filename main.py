@@ -354,15 +354,15 @@ async def tutorials_callback(client, callback_query):
 @app.on_callback_query(filters.regex("gaming_tutorial"))
 async def gaming_tutorial_callback(client, callback_query):
     video_file_ids = [
-        {"file_id": "BAACAgQAAxkBAAICYmaZWoIZXc2OHCfbMzylG82zgfXUAAJDFAACJt7AUN1alOeQ3NrsHgQ", "caption": "آموزش سرویس گیمینگ در ایفون"},
-        {"file_id": "BAACAgQAAxkBAAICZGaZWyJw1wVe7crrzO2YpyJUhShLAALIFQACWr_JUJWfEsa1RyftHgQ", "caption": "آموزش سرویس گیمینگ در اندروید"}
+        {"file_id": "BAACAgQAAxkBAAMvZpmVpJgF40_xwmSvmUnClGc9TT8AAkMUAAIm3sBQFr8LhMvQ5koeBA", "caption": "آموزش سرویس گیمینگ در ایفون"},
+        {"file_id": "BAACAgQAAxkBAAMtZpmVY6XhfYC-No1ccchUQTAQ1tYAAsgVAAJav8lQzXrVSPugrOoeBA", "caption": "آموزش سرویس گیمینگ در اندروید"}
     ]
     for video in video_file_ids:
         await callback_query.message.reply_video(video["file_id"], caption=video["caption"])
 
 @app.on_callback_query(filters.regex("v2_tutorial"))
 async def v2_tutorial_callback(client, callback_query):
-    video_file_id = "BAACAgQAAxkBAAICXmaZWhKznOKCUxGAnhIGdFDogrx7AAJBFAACJt7AUPVm6uDZPMxtHgQ"
+    video_file_id = "BAACAgQAAxkBAAMzZpmV5Ss5CqGAzk3S-BEygiqcsAAkEUAAIm3sBQ0_d0khmxc1weBA"
     caption = "آموزش V2 در اندروید و ایفون"
     await callback_query.message.reply_video(video_file_id, caption=caption)
 
