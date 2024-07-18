@@ -165,8 +165,11 @@ async def send_admin_message(admin_id, message_text, reply_markup=None):
     await app.send_message(admin_id, message_text, reply_markup=reply_markup)
 
 # Command handlers
+message_to_delete = None
+
 @app.on_message(filters.command("start") & filters.private)
 async def start(client, message):
+    global message_to_delete  # Use the global variable
     chat_id = message.chat.id
     name = message.from_user.first_name
 
@@ -210,45 +213,38 @@ async def start(client, message):
                                             "زیر مجموعه گیری 🔗", callback_data="referral_link")]
                                     ]))
         else:
-                await message.reply_text("شماره تماس شما با موفقیت ثبت شد! اکنون از منوهای زیر می‌توانید استفاده کنید:",
-                             reply_markup=InlineKeyboardMarkup([
-                                 [InlineKeyboardButton(
-                                     "پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
-                                 [InlineKeyboardButton(
-                                     "خرید سرویس گیمینگ 🎮", callback_data="shop_openvpn")],
-                                 [InlineKeyboardButton(
-                                     "خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="shop_v2ray")],
-                                 [InlineKeyboardButton(
-                                     "خرید های من 🛍️", callback_data="my_configs")],
-                                 [InlineKeyboardButton(
-                                     "دانلود کانفیگ های OpenVPN گیمینگ 📥", callback_data="download_configs")],
-                                 [InlineKeyboardButton(
-                                     " افزایش موجودی کیف پول 💰", callback_data="add_amount")],
-                                 [InlineKeyboardButton(
-                                     " زیر مجموعه گیری 🔗", callback_data="referral_link")],
-                                 [InlineKeyboardButton(
-                                     "ارتباط با پشتیبانی  📞", callback_data="support_id"),
-                                  InlineKeyboardButton(
-                                     "آموزش 📚", callback_data="tutorials")],
-                             ]))
+            keyboard = ReplyKeyboardMarkup(
+                [[KeyboardButton("اشتراک‌گذاری شماره ☎️", request_contact=True)]],
+                one_time_keyboard=True
+            )
+            message_to_delete = await message.reply_text(
+                "👋🏻سلام به ربات خودتون خوش اومدید❤️\nلطفاً شماره تماس خود را به اشتراک بگذارید.",
+                reply_markup=keyboard
+            )
 
-            
     else:
-        await message.reply_text(
-    "👋🏻سلام به ربات خودتون خوش اومدید❤️\nلطفاً شماره تماس خود را به اشتراک بگذارید.",
-    reply_markup=ReplyKeyboardMarkup(
-        [[KeyboardButton("اشتراک‌گذاری شماره ☎️", request_contact=True)]],
-        one_time_keyboard=True))
+        keyboard = ReplyKeyboardMarkup(
+            [[KeyboardButton("اشتراک‌گذاری شماره ☎️", request_contact=True)]],
+            one_time_keyboard=True
+        )
+        message_to_delete = await message.reply_text(
+            "👋🏻سلام به ربات خودتون خوش اومدید❤️\nلطفاً شماره تماس خود را به اشتراک بگذارید.",
+            reply_markup=keyboard
+        )
 
 
 @app.on_message(filters.contact & filters.private)
 async def contact(client, message):
+    global message_to_delete  # Use the global variable
     chat_id = message.chat.id
     phone_number = message.contact.phone_number
 
     cursor.execute(
         "UPDATE users SET phone_number = ? WHERE chat_id = ?", (phone_number, chat_id))
     conn.commit()
+
+    if message_to_delete:
+        await message_to_delete.delete()  # Delete the contact sharing message
 
     await message.reply_text("شماره تماس شما با موفقیت ثبت شد! اکنون از منوهای زیر می‌توانید استفاده کنید:",
                              reply_markup=InlineKeyboardMarkup([
