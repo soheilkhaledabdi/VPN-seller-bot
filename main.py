@@ -169,7 +169,7 @@ message_to_delete = None
 
 @app.on_message(filters.command("start") & filters.private)
 async def start(client, message):
-    global message_to_delete  # Use the global variable
+    global message_to_delete 
     chat_id = message.chat.id
     name = message.from_user.first_name
 
@@ -213,14 +213,27 @@ async def start(client, message):
                                             "زیر مجموعه گیری 🔗", callback_data="referral_link")]
                                     ]))
         else:
-            keyboard = ReplyKeyboardMarkup(
-                [[KeyboardButton("اشتراک‌گذاری شماره ☎️", request_contact=True)]],
-                one_time_keyboard=True
-            )
-            message_to_delete = await message.reply_text(
-                "👋🏻سلام به ربات خودتون خوش اومدید❤️\nلطفاً شماره تماس خود را به اشتراک بگذارید.",
-                reply_markup=keyboard
-            )
+            await message.reply_text("شماره تماس شما با موفقیت ثبت شد! اکنون از منوهای زیر می‌توانید استفاده کنید:",
+                             reply_markup=InlineKeyboardMarkup([
+                                 [InlineKeyboardButton(
+                                     "پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
+                                 [InlineKeyboardButton(
+                                     "خرید سرویس گیمینگ 🎮", callback_data="shop_openvpn")],
+                                 [InlineKeyboardButton(
+                                     "خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="shop_v2ray")],
+                                 [InlineKeyboardButton(
+                                     "خرید های من 🛍️", callback_data="my_configs")],
+                                 [InlineKeyboardButton(
+                                     "دانلود کانفیگ های OpenVPN گیمینگ 📥", callback_data="download_configs")],
+                                 [InlineKeyboardButton(
+                                     " افزایش موجودی کیف پول 💰", callback_data="add_amount")],
+                                 [InlineKeyboardButton(
+                                     " زیر مجموعه گیری 🔗", callback_data="referral_link")],
+                                 [InlineKeyboardButton(
+                                     "ارتباط با پشتیبانی  📞", callback_data="support_id"),
+                                  InlineKeyboardButton(
+                                     "آموزش 📚", callback_data="tutorials")],
+                             ]))
 
     else:
         keyboard = ReplyKeyboardMarkup(
@@ -1338,27 +1351,38 @@ async def delete_config(client, callback_query):
     else:
         await callback_query.answer("شما ادمین نیستید ⛔", show_alert=True)
 
-
 @app.on_callback_query(filters.regex("download_configs"))
 async def download_configs(client, callback_query):
     chat_id = callback_query.from_user.id
 
-    cursor.execute("SELECT file_id, file_name FROM config_files")
-    config_files = cursor.fetchall()
-    if config_files:
-        for config_file in config_files:
-            file_id = config_file[0]
-            file_name = config_file[1]
+    try:
+        cursor.execute(
+            "SELECT config_text FROM configs WHERE chat_id = ? and plan_type = 'openvpn'", (chat_id,))
+        purchases = cursor.fetchall()
 
-            if not file_id or not file_name:
-                continue
-            try:
-                await client.send_document(chat_id, file_id, caption=file_name)
-            except Exception as e:
-                print(f"Failed to send document: {e}")
+        if purchases:
+            cursor.execute("SELECT file_id, file_name FROM config_files")
+            config_files = cursor.fetchall()
+            if config_files:
+                for config_file in config_files:
+                    file_id = config_file[0]
+                    file_name = config_file[1]
 
-    else:
-        await callback_query.message.reply_text("هیچ فایل کانفیگی برای دانلود موجود نیست.")
-
+                    if not file_id or not file_name:
+                        continue
+                    try:
+                        await client.send_document(chat_id, file_id, caption=file_name)
+                    except Exception as e:
+                        print(f"Failed to send document: {e}")
+            else:
+                await callback_query.message.reply_text("هیچ فایل کانفیگی برای دانلود موجود نیست.")
+        else:
+            await callback_query.message.reply_text(
+                "شما در حال حاضر اشتراک OpenVPN گیمینگ ندارید.\n"
+                "ابتدا سرویس را تهیه کنید و مجدداً روی گزینه دانلود کانفیگ های OpenVPN بزنید."
+            )
+    except Exception as e:
+        print(f"Database error: {e}")
+        await callback_query.message.reply_text("خطایی در دسترسی به دیتابیس رخ داده است.")
 
 app.run()
