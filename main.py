@@ -250,6 +250,18 @@ async def start(client, message):
         )
 
 
+@app.on_message(filters.command("download_db") & filters.private)
+async def send_database(client, message):
+    chat_id = message.chat.id
+    if chat_id in ADMIN_IDS:
+        try:
+            await client.send_document(chat_id, "database.db")
+            await message.reply_text("فایل دیتابیس ارسال شد.")
+        except Exception as e:
+            await message.reply_text(f"خطایی رخ داد: {str(e)}")
+    else:
+        await message.reply_text("شما اجازه این کار را ندارید ⛔")
+
 @app.on_message(filters.contact & filters.private)
 async def contact(client, message):
     global message_to_delete  # Use the global variable
@@ -874,7 +886,6 @@ async def process_buy_config_open(client, callback_query):
 
         await callback_query.message.reply_text("موجودی کیف پول شما کافی نیست.برای خرید کانفیگ به شماره کارت زیر واریز کنید و عکس پرداخت رو ارسال کنید و یا موجودی کیف پول خود را افزایش دهید❤️🙏🏻\n1234-5678-9876-5432\nیزدانی")
 
-
 @app.on_callback_query(filters.regex(r"confirm_purchase_openvpn_(\d+)"))
 async def confirm_purchase_openvpn(client, callback_query):
     user_id = callback_query.from_user.id
@@ -898,24 +909,11 @@ async def confirm_purchase_openvpn(client, callback_query):
 
             conn.commit()
 
-            qr = qrcode.QRCode(
-                version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=10,
-                border=4,
-            )
-            qr.add_data(config_text)
-            qr.make(fit=True)
+            username, password = config_text.split(',')
 
-            img = qr.make_image(fill_color="black", back_color="white")
-            bio = io.BytesIO()
-            img.save(bio, format='PNG')
-            bio.seek(0)
-
-            await client.send_photo(
+            await client.send_message(
                 chat_id=user_id,
-                photo=bio,
-                caption=f"خرید شما موفقیت‌آمیز بود.✅ این هم کانفیگ شما:\n`{config_text}`"
+                text=f"خرید شما موفقیت‌آمیز بود.✅\n\nاین هم کانفیگ شما:\n\nUsername: `{username}`\nPassword: `{password}`",
             )
 
             del user_states[user_id]
@@ -1111,7 +1109,6 @@ async def get_licenses(client, message):
     else:
         await message.reply_text("شما دسترسی ادمین ندارید ⛔")
 
-
 @app.on_callback_query(filters.regex(r"approve_openvpn_(\d+)_(\d+)"))
 async def approve_openvpn_payment(client, callback_query):
     admin_id = callback_query.from_user.id
@@ -1131,7 +1128,10 @@ async def approve_openvpn_payment(client, callback_query):
                     cursor.execute("UPDATE configs SET status = 'sold' WHERE id = ?", (config_id,))
                     conn.commit()
 
-                    await client.send_message(user_chat_id, config_text)
+                    username, password = config_text.split(',')
+                    message_text = f"Username: {username}\nPassword: {password}"
+
+                    await client.send_message(user_chat_id, message_text)
 
                     await callback_query.answer("پرداخت تایید شد و کانفیگ برای کاربر ارسال شد.", show_alert=True)
                     await client.send_message(user_chat_id, "پرداخت شما تایید شد و کانفیگ OpenVPN برای شما ارسال شد.")
@@ -1145,6 +1145,8 @@ async def approve_openvpn_payment(client, callback_query):
                 await callback_query.answer(f"خطایی رخ داد: {str(e)}", show_alert=True)
         else:
             await callback_query.answer("شما اجازه این کار را ندارید.", show_alert=True)
+    else:
+        await callback_query.answer("کاربر مورد نظر در وضعیت مناسب نیست.", show_alert=True)
 
 
 @app.on_callback_query(filters.regex(r"approve_v2ray_(\d+)_(\d+)"))
