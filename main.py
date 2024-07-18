@@ -330,7 +330,7 @@ async def tutorials_callback(client, callback_query):
                                                 [InlineKeyboardButton(
                                                     "گیمینگ 🎮", callback_data="gaming_tutorial")],
                                                 [InlineKeyboardButton(
-                                                    "خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="v2_tutorial")]
+                                                    "آموزش سرویس V2ray 📲", callback_data="v2_tutorial")]
                                             ]))
 
 
@@ -346,7 +346,7 @@ async def gaming_tutorial_callback(client, callback_query):
 @app.on_callback_query(filters.regex("v2_tutorial"))
 async def v2_tutorial_callback(client, callback_query):
     video_file_id = "BAACAgQAAxkBAAICXmaZWhKznOKCUxGAnhIGdFDogrx7AAJBFAACJt7AUPVm6uDZPMxtHgQ"
-    caption = "آموزش V2 در اندروید"
+    caption = "آموزش V2 در اندروید و ایفون"
     await callback_query.message.reply_video(video_file_id, caption=caption)
 
 @app.on_callback_query(filters.regex("sold_configs"))
