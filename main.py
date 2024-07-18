@@ -1,15 +1,11 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.errors import PeerIdInvalid
-
 import sqlite3
 import qrcode
 import io
-from PIL import Image
 import os
 
 
-# Create database connection
 conn = sqlite3.connect('database.db')
 cursor = conn.cursor()
 
@@ -123,15 +119,16 @@ conn.commit()
 
 # end database
 
-# Bot token and admin list
-API_ID = 29365133
-API_HASH = "YOUR_SECRET_API_KEY"
-BOT_TOKEN = "YOUR_SECRET_API_KEY"
+# Admin list ides
 ADMIN_IDS = [1734062356, 799574527, 6171236939,5973267660,6171236939,624982815,494197025]
 
-# Initialize Client
-app = Client("FIFI shop", api_id=API_ID,
-             api_hash=API_HASH, bot_token=BOT_TOKEN)
+
+app = Client(
+            os.getenv("BOT_NAME")
+            ,api_id=os.getenv("API_ID")
+            ,api_hash=os.getenv('API_HASH')
+            ,bot_token=os.getenv("BOT_TOKEN"))
+
 
 # Dictionary to store user states
 user_states = {}
@@ -874,8 +871,7 @@ async def process_buy_config_v2ray(client, callback_query):
             "action": f"confirm_purchase_v2ray_{plan_id}", "plan_id": plan_id, "plan_price": plan_price}
 
         await callback_query.message.reply_text(
-            f"موجودی کیف پول شما کافی است. آیا مایل به خرید این پلن با قیمت {
-                plan_price} تومان هستید؟",
+            f"موجودی کیف پول شما کافی است. آیا مایل به خرید این پلن با قیمت {plan_price} تومان هستید؟",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton(
                     "بله", callback_data=f"confirm_purchase_v2ray_{plan_id}")],
