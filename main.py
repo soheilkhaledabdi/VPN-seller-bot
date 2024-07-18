@@ -1,5 +1,6 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from dotenv import load_dotenv
 import sqlite3
 import qrcode
@@ -46,17 +47,6 @@ CREATE TABLE IF NOT EXISTS openvpn_plans (
 ''')
 
 cursor.execute('''
-    CREATE TABLE IF NOT EXISTS purchased_configs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        plan_id INTEGER,
-        plan_type TEXT,
-        purchase_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-''')
-
-
-cursor.execute('''
 CREATE TABLE IF NOT EXISTS v2ray_plans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL
@@ -97,7 +87,6 @@ try:
     cursor.execute('''
                    ALTER TABLE configs ADD COLUMN status TEXT DEFAULT 'available';
                    ''')
-
 except sqlite3.OperationalError:
     pass
 
@@ -115,6 +104,19 @@ try:
                    ''')
 except sqlite3.OperationalError:
     pass
+
+try:
+    cursor.execute('''
+    ALTER TABLE configs ADD COLUMN chat_id INTEGER NULL;
+    ''')
+except sqlite3.OperationalError:
+    pass
+
+try:
+    cursor.execute("ALTER TABLE users ADD COLUMN phone_number TEXT")
+except sqlite3.OperationalError as e:
+    pass
+
 
 conn.commit()
 
@@ -152,6 +154,7 @@ app = Client(
 )
 
 # Dictionary to store user states
+
 user_states = {}
 pending_transactions = {}
 
@@ -162,8 +165,6 @@ async def send_admin_message(admin_id, message_text, reply_markup=None):
     await app.send_message(admin_id, message_text, reply_markup=reply_markup)
 
 # Command handlers
-
-
 @app.on_message(filters.command("start") & filters.private)
 async def start(client, message):
     chat_id = message.chat.id
@@ -173,58 +174,103 @@ async def start(client, message):
         "INSERT OR IGNORE INTO users (chat_id, name) VALUES (?, ?)", (chat_id, name))
     conn.commit()
 
-    args = message.text.split()
-    if len(args) > 1:
-        referrer_id = int(args[1])
-        cursor.execute(
-            "SELECT referrer_id FROM referrals WHERE user_id = ?", (chat_id,))
-        referrer = cursor.fetchone()
+    cursor.execute(
+        "SELECT phone_number FROM users WHERE chat_id = ?", (chat_id,))
+    phone_number = cursor.fetchone()
 
-        if not referrer:
+    if phone_number and phone_number[0]:
+        args = message.text.split()
+        if len(args) > 1:
+            referrer_id = int(args[1])
             cursor.execute(
-                "INSERT OR IGNORE INTO referrals (user_id, referrer_id) VALUES (?, ?)", (chat_id, referrer_id))
-            conn.commit()
-            await message.reply_text("🎉 شما از طریق لینک معرفی وارد شده‌اید. خوش آمدید! 🎉")
+                "SELECT referrer_id FROM referrals WHERE user_id = ?", (chat_id,))
+            referrer = cursor.fetchone()
 
-    if chat_id in ADMIN_IDS:
-        user_states[chat_id] = "admin_logged_in"
-        await message.reply_text("✅ سلام عزیزم به بخش ادمین خوش اومدی از منو های زیر برای مدیریت ربات استفاده بکن!",
-                                 reply_markup=InlineKeyboardMarkup([
-                                     [InlineKeyboardButton(
-                                         "پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
-                                     [InlineKeyboardButton(
-                                         "کانفیگ‌های فروش رفته 💼", callback_data="sold_configs")],
-                                     [InlineKeyboardButton(
-                                         "کانفیگ OpenVPN ➕", callback_data="openvpn_config")],
-                                     [InlineKeyboardButton(
-                                         "کانفیگ V2Ray ➕", callback_data="v2ray_config")],
-                                     [InlineKeyboardButton(
-                                         "مدیریت فایل‌های کانفیگ 🗂", callback_data="manage_configs")],
-                                     [InlineKeyboardButton(
-                                         "زیر مجموعه گیری 🔗", callback_data="referral_link")]
-                                 ]))
+            if not referrer:
+                cursor.execute(
+                    "INSERT OR IGNORE INTO referrals (user_id, referrer_id) VALUES (?, ?)", (chat_id, referrer_id))
+                conn.commit()
+                await message.reply_text("🎉 شما از طریق لینک معرفی وارد شده‌اید. خوش آمدید! 🎉")
+
+        if chat_id in ADMIN_IDS:
+            user_states[chat_id] = "admin_logged_in"
+            await message.reply_text("✅ سلام عزیزم به بخش ادمین خوش اومدی از منو های زیر برای مدیریت ربات استفاده بکن!",
+                                    reply_markup=InlineKeyboardMarkup([
+                                        [InlineKeyboardButton(
+                                            "پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
+                                        [InlineKeyboardButton(
+                                            "کانفیگ‌های فروش رفته 💼", callback_data="sold_configs")],
+                                        [InlineKeyboardButton(
+                                            "کانفیگ OpenVPN ➕", callback_data="openvpn_config")],
+                                        [InlineKeyboardButton(
+                                            "کانفیگ V2Ray ➕", callback_data="v2ray_config")],
+                                        [InlineKeyboardButton(
+                                            "مدیریت فایل‌های کانفیگ 🗂", callback_data="manage_configs")],
+                                        [InlineKeyboardButton(
+                                            "زیر مجموعه گیری 🔗", callback_data="referral_link")]
+                                    ]))
+        else:
+                await message.reply_text("شماره تماس شما با موفقیت ثبت شد! اکنون از منوهای زیر می‌توانید استفاده کنید:",
+                             reply_markup=InlineKeyboardMarkup([
+                                 [InlineKeyboardButton(
+                                     "پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
+                                 [InlineKeyboardButton(
+                                     "خرید سرویس گیمینگ 🎮", callback_data="shop_openvpn")],
+                                 [InlineKeyboardButton(
+                                     "خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="shop_v2ray")],
+                                 [InlineKeyboardButton(
+                                     "خرید های من 🛍️", callback_data="my_configs")],
+                                 [InlineKeyboardButton(
+                                     "دانلود کانفیگ های OpenVPN گیمینگ 📥", callback_data="download_configs")],
+                                 [InlineKeyboardButton(
+                                     " افزایش موجودی کیف پول 💰", callback_data="add_amount")],
+                                 [InlineKeyboardButton(
+                                     " زیر مجموعه گیری 🔗", callback_data="referral_link")],
+                                 [InlineKeyboardButton(
+                                     "ارتباط با پشتیبانی  📞", callback_data="support_id"),
+                                  InlineKeyboardButton(
+                                     "آموزش 📚", callback_data="tutorials")],
+                             ]))
+
+            
     else:
-        await message.reply_text("👋🏻سلام به ربات خودتون خوش اومدید❤️\nاز منو های زیر جهت خرید میتونید استفاده کنید🤗❤️",
-                                 reply_markup=InlineKeyboardMarkup([
-                                     [InlineKeyboardButton(
-                                         "پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
-                                     [InlineKeyboardButton(
-                                         "🌎 سرویس‌گیمینگ", callback_data="shop_openvpn")],
-                                     [InlineKeyboardButton(
-                                         "📱 V2", callback_data="shop_v2ray")],
-                                     [InlineKeyboardButton(
-                                         "مشاهده لیست کانفیگ‌های من 📄", callback_data="my_configs")],
-                                     [InlineKeyboardButton(
-                                         "دانلود فایل‌های کانفیگ 📥", callback_data="download_configs")],
-                                     [InlineKeyboardButton(
-                                         " افزایش موجودی کیف پول 💰", callback_data="add_amount")],
-                                     [InlineKeyboardButton(
-                                         " زیر مجموعه گیری 🔗", callback_data="referral_link")],
-                                     [InlineKeyboardButton(
-                                         "ارتباط پشتیبانی 📞", callback_data="support_id")],
-                                     [InlineKeyboardButton(
-                                         "آموزش 📚", callback_data="tutorials")]
-                                 ]))
+        await message.reply_text(
+    "👋🏻سلام به ربات خودتون خوش اومدید❤️\nلطفاً شماره تماس خود را به اشتراک بگذارید.",
+    reply_markup=ReplyKeyboardMarkup(
+        [[KeyboardButton("اشتراک‌گذاری شماره ☎️", request_contact=True)]],
+        one_time_keyboard=True))
+
+
+@app.on_message(filters.contact & filters.private)
+async def contact(client, message):
+    chat_id = message.chat.id
+    phone_number = message.contact.phone_number
+
+    cursor.execute(
+        "UPDATE users SET phone_number = ? WHERE chat_id = ?", (phone_number, chat_id))
+    conn.commit()
+
+    await message.reply_text("شماره تماس شما با موفقیت ثبت شد! اکنون از منوهای زیر می‌توانید استفاده کنید:",
+                             reply_markup=InlineKeyboardMarkup([
+                                 [InlineKeyboardButton(
+                                     "پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
+                                 [InlineKeyboardButton(
+                                     "خرید سرویس گیمینگ 🎮", callback_data="shop_openvpn")],
+                                 [InlineKeyboardButton(
+                                     "خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="shop_v2ray")],
+                                 [InlineKeyboardButton(
+                                     "خرید های من 🛍️", callback_data="my_configs")],
+                                 [InlineKeyboardButton(
+                                     "دانلود کانفیگ های OpenVPN گیمینگ 📥", callback_data="download_configs")],
+                                 [InlineKeyboardButton(
+                                     " افزایش موجودی کیف پول 💰", callback_data="add_amount")],
+                                 [InlineKeyboardButton(
+                                     " زیر مجموعه گیری 🔗", callback_data="referral_link")],
+                                 [InlineKeyboardButton(
+                                     "ارتباط با پشتیبانی  📞", callback_data="support_id"),
+                                  InlineKeyboardButton(
+                                     "آموزش 📚", callback_data="tutorials")],
+                             ]))
 
 
 @app.on_callback_query(filters.regex("go_home"))
@@ -257,22 +303,22 @@ async def start(client, callback_query):
                 [InlineKeyboardButton(
                     "پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
                 [InlineKeyboardButton(
-                    "🌎 سرویس‌گیمینگ", callback_data="shop_openvpn")],
+                    "خرید سرویس گیمینگ 🎮", callback_data="shop_openvpn")],
                 [InlineKeyboardButton(
-                    "📱 V2", callback_data="shop_v2ray")],
+                    "خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="shop_v2ray")],
                 [InlineKeyboardButton(
-                    "مشاهده لیست کانفیگ‌های من 📄", callback_data="my_configs")],
+                    "خرید های من", callback_data="my_configs")],
                 [InlineKeyboardButton(
-                    "دانلود فایل‌های کانفیگ 📥", callback_data="download_configs")],
+                    "دانلود کانفیگ های OpenVPN گیمینگ 📥", callback_data="download_configs")],
                 [InlineKeyboardButton(
                     " افزایش موجودی کیف پول 💰", callback_data="add_amount")],
                 [InlineKeyboardButton(
                     " زیر مجموعه گیری 🔗", callback_data="referral_link")],
                 [InlineKeyboardButton(
-                    "ارتباط پشتیبانی 📞", callback_data="support_id")],
-                [InlineKeyboardButton(
+                    "ارتباط با پشتیبانی  📞", callback_data="support_id"),
+                 InlineKeyboardButton(
                     "آموزش 📚", callback_data="tutorials")]
-            ])
+                ])
         )
 
 
@@ -288,22 +334,22 @@ async def tutorials_callback(client, callback_query):
                                                 [InlineKeyboardButton(
                                                     "گیمینگ 🎮", callback_data="gaming_tutorial")],
                                                 [InlineKeyboardButton(
-                                                    "V2 📱", callback_data="v2_tutorial")]
+                                                    "خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="v2_tutorial")]
                                             ]))
 
 
 @app.on_callback_query(filters.regex("gaming_tutorial"))
 async def gaming_tutorial_callback(client, callback_query):
     video_file_ids = [
-        {"file_id": "BAACAgQAAxkBAAIB-GaZP9P_Envuw5M6Txg25yM9rzLCAAJDFAACJt7AUN1alOeQ3NrsHgQ", "caption": "آموزش سرویس گیمینگ در ایفون"},
-        {"file_id": "BAACAgQAAxkBAAIB-GaZP9P_Envuw5M6Txg25yM9rzLCAAJDFAACJt7AUN1alOeQ3NrsHgQ", "caption": "آموزش سرویس گیمینگ در اندروید"}
+        {"file_id": "BAACAgQAAxkBAAICYmaZWoIZXc2OHCfbMzylG82zgfXUAAJDFAACJt7AUN1alOeQ3NrsHgQ", "caption": "آموزش سرویس گیمینگ در ایفون"},
+        {"file_id": "BAACAgQAAxkBAAICZGaZWyJw1wVe7crrzO2YpyJUhShLAALIFQACWr_JUJWfEsa1RyftHgQ", "caption": "آموزش سرویس گیمینگ در اندروید"}
     ]
     for video in video_file_ids:
         await callback_query.message.reply_video(video["file_id"], caption=video["caption"])
 
 @app.on_callback_query(filters.regex("v2_tutorial"))
 async def v2_tutorial_callback(client, callback_query):
-    video_file_id = "BAACAgQAAxkBAAIHg2aYSTAzo2jpUH-R0dVYQcqF5yAjAAJBFAACJt7AUAYKTFGAyowZHgQ"
+    video_file_id = "BAACAgQAAxkBAAICXmaZWhKznOKCUxGAnhIGdFDogrx7AAJBFAACJt7AUPVm6uDZPMxtHgQ"
     caption = "آموزش V2 در اندروید"
     await callback_query.message.reply_video(video_file_id, caption=caption)
 
@@ -617,14 +663,11 @@ async def add_amount(client, callback_query):
     print(user_states)
     await callback_query.message.reply_text("لطفا مبلغ مورد نیاز خود را به تومان وارد بکنید")
 
-
 @app.on_message(filters.photo & filters.private)
 async def handle_wallet_amount_photo(client, message):
     chat_id = message.chat.id
     state = user_states[chat_id]
-
-    
-    print(state)
+    username  = message.chat.username
     if user_states.get(chat_id) == "awaiting_payment_proof":
         photo_id = message.photo.file_id
         pending_transactions[chat_id]["photo_id"] = photo_id
@@ -648,32 +691,40 @@ async def handle_wallet_amount_photo(client, message):
                 print(f"Failed to send photo to admin {admin_id}: {e}")
 
         user_states[chat_id] = "pending_admin_approval"
-        chat_id = message.chat.id
 
     elif isinstance(state, dict) and state.get("action").startswith('awaiting_admin_approval_openvpn_'):
         plan_type = state.get("action").split("_")[-1]
         user_states[chat_id] = f"awaiting_admin_approval_openvpn_{plan_type}"
         file_id = message.photo.file_id
-        await message.reply_text("عکس تایید پرداخت OpenVPN دریافت شد. منتظر تایید ادمین باشید.")
+        await message.reply_text("عکس ارسالی برای ادمین ارسال شد، منتظر تایید باشید")
 
         for admin_id in ADMIN_IDS:
-            await client.send_photo(admin_id, file_id, caption=f"کاربر {chat_id} عکس تایید پرداخت OpenVPN پلن {plan_type} ارسال کرده است. برای تایید، از دستور /approve_openvpn_{chat_id}_{plan_type} استفاده کنید.",
-                                    reply_markup=InlineKeyboardMarkup([
-                                        [InlineKeyboardButton("تایید", callback_data=f"approve_openvpn_{chat_id}_{plan_type}")],
-                                        [InlineKeyboardButton("رد", callback_data=f"reject_openvpn_{chat_id}_{plan_type}")]
-                                    ]))
+            try:
+                await client.get_users(admin_id)
+                await client.send_photo(admin_id, file_id, caption=f"کاربر @{username} عکس تایید پرداخت OpenVPN پلن {plan_type} ارسال کرده است. برای تایید، از دستور /approve_openvpn_{chat_id}_{plan_type} استفاده کنید.",
+                                        reply_markup=InlineKeyboardMarkup([
+                                            [InlineKeyboardButton("تایید", callback_data=f"approve_openvpn_{chat_id}_{plan_type}")],
+                                            [InlineKeyboardButton("رد", callback_data=f"reject_openvpn_{chat_id}_{plan_type}")]
+                                        ]))
+            except Exception as e:
+                print(f"Failed to send photo to admin {admin_id}: {e}")
+
     elif isinstance(state, dict) and state.get("action").startswith('awaiting_admin_approval_v2ray_'):
         plan_type = state.get("action").split("_")[-1]
         user_states[chat_id] = f"awaiting_admin_approval_v2ray_{plan_type}"
         file_id = message.photo.file_id
-        await message.reply_text("عکس تایید پرداخت V2ray دریافت شد. منتظر تایید ادمین باشید.")
+        await message.reply_text("عکس ارسالی برای ادمین ارسال شد، منتظر تایید باشید")
 
         for admin_id in ADMIN_IDS:
-            await client.send_photo(admin_id, file_id, caption=f"کاربر {chat_id} عکس تایید پرداخت V2ray پلن {plan_type} ارسال کرده است. برای تایید، از دستور /approve_v2ray_{chat_id}_{plan_type} استفاده کنید.",
-                                    reply_markup=InlineKeyboardMarkup([
-                                        [InlineKeyboardButton("تایید", callback_data=f"approve_v2ray_{chat_id}_{plan_type}")],
-                                        [InlineKeyboardButton("رد", callback_data=f"reject_v2ray_{chat_id}_{plan_type}")]
-                                    ]))
+            try:
+                await client.get_users(admin_id)
+                await client.send_photo(admin_id, file_id, caption=f"کاربر @{username} عکس تایید پرداخت V2ray پلن {plan_type} ارسال کرده است. برای تایید، از دستور /approve_v2ray_{chat_id}_{plan_type} استفاده کنید.",
+                                        reply_markup=InlineKeyboardMarkup([
+                                            [InlineKeyboardButton("تایید", callback_data=f"approve_v2ray_{chat_id}_{plan_type}")],
+                                            [InlineKeyboardButton("رد", callback_data=f"reject_v2ray_{chat_id}_{plan_type}")]
+                                        ]))
+            except Exception as e:
+                print(f"Failed to send photo to admin {admin_id}: {e}")
 
     else:
         await message.reply_text("لطفاً ابتدا مقدار کیف پول را وارد کنید.")
@@ -763,6 +814,17 @@ async def disabled_button(client, callback_query):
 async def process_buy_config_open(client, callback_query):
     user_id = callback_query.from_user.id
     plan_id = int(callback_query.data.split('_')[-1])
+    
+    cursor.execute("""
+        SELECT COUNT(*) FROM configs 
+        WHERE plan_id = ? AND plan_type = 'openvpn' AND status = 'available'
+    """, (plan_id,))
+    available_count = cursor.fetchone()[0]
+
+    if available_count == 0:
+        await callback_query.answer("هیچ کانفیگی برای این پلن موجود نیست.", show_alert=True)
+        return
+    
     cursor.execute("SELECT balance FROM wallets WHERE user_id = ?", (user_id,))
     user_wallet = cursor.fetchone()
 
@@ -806,7 +868,8 @@ async def confirm_purchase_openvpn(client, callback_query):
         if config_row:
             config_id, config_text = config_row
             cursor.execute(
-                "UPDATE configs SET status = 'sold' WHERE id = ?", (config_id,))
+                    "UPDATE configs SET status = 'sold', chat_id = ? WHERE id = ?",(user_id, config_id))
+
             conn.commit()
 
             qr = qrcode.QRCode(
@@ -877,17 +940,27 @@ async def shop_openvpn(client, callback_query):
 async def disabled_button(client, callback_query):
     await callback_query.answer("این پلن در حال حاضر موجود نیست.", show_alert=True)
 
-
 @app.on_callback_query(filters.regex(r"shop_plan_v2ray_(\d+)"))
 async def process_buy_config_v2ray(client, callback_query):
     user_id = callback_query.from_user.id
     plan_id = int(callback_query.data.split('_')[-1])
 
+    cursor.execute("""
+        SELECT COUNT(*) FROM configs 
+        WHERE plan_id = ? AND plan_type = 'v2ray' AND status = 'available'
+    """, (plan_id,))
+    available_count = cursor.fetchone()[0]
+
+    if available_count == 0:
+        await callback_query.answer("هیچ کانفیگی برای این پلن موجود نیست.", show_alert=True)
+        return
+
     cursor.execute("SELECT balance FROM wallets WHERE user_id = ?", (user_id,))
     user_wallet = cursor.fetchone()
 
-    if user_wallet and user_wallet[0] >= get_plan_price(plan_id, "v2ray"):
-        plan_price = get_plan_price(plan_id, "v2ray")
+    plan_price = get_plan_price(plan_id, "v2ray")
+
+    if user_wallet and user_wallet[0] >= plan_price:
         user_states[user_id] = {
             "action": f"confirm_purchase_v2ray_{plan_id}", "plan_id": plan_id, "plan_price": plan_price}
 
@@ -902,7 +975,11 @@ async def process_buy_config_v2ray(client, callback_query):
     else:
         user_states[user_id] = {
             "action": f"awaiting_admin_approval_v2ray_{plan_id}", "plan_id": plan_id}
-        await callback_query.message.reply_text("موجودی کیف پول شما کافی نیست.برای خرید کانفیگ به شماره کارت زیر واریز کنید و عکس پرداخت رو ارسال کنید و یا موجودی کیف پول خود را افزایش دهید❤️🙏🏻\n1234-5678-9876-5432\nیزدانی")
+
+        await callback_query.message.reply_text(
+            "موجودی کیف پول شما کافی نیست. برای خرید کانفیگ به شماره کارت زیر واریز کنید و عکس پرداخت را ارسال کنید و یا موجودی کیف پول خود را افزایش دهید❤️🙏🏻\n1234-5678-9876-5432\nیزدانی"
+        )
+
 
 
 @app.on_callback_query(filters.regex(r"confirm_purchase_v2ray_(\d+)"))
@@ -924,9 +1001,11 @@ async def confirm_purchase_v2ray(client, callback_query):
 
         if config_row:
             config_id, config_text = config_row
-
+            
             cursor.execute(
-                "UPDATE configs SET status = 'sold' WHERE id = ?", (config_id,))
+                "UPDATE configs SET status = 'sold', chat_id = ? WHERE id = ?",(user_id, config_id))
+
+
             conn.commit()
 
             qr = qrcode.QRCode(
@@ -1023,8 +1102,7 @@ async def approve_openvpn_payment(client, callback_query):
                 if config_row:
                     config_id, config_text = config_row
 
-                    cursor.execute(
-                        "UPDATE configs SET status = 'sold' WHERE id = ?", (config_id,))
+                    cursor.execute("UPDATE configs SET status = 'sold' WHERE id = ?", (config_id,))
                     conn.commit()
 
                     await client.send_message(user_chat_id, config_text)
@@ -1059,8 +1137,8 @@ async def approve_v2ray_payment(client, callback_query):
                 if config_row:
                     config_id, config_text = config_row
 
-                    cursor.execute(
-                        "UPDATE configs SET status = 'sold' WHERE id = ?", (config_id,))
+                    cursor.execute("UPDATE configs SET status = 'sold', chat_id = ? WHERE id = ?",(user_chat_id, config_id))
+
                     conn.commit()
 
                     await client.send_message(user_chat_id, config_text)
@@ -1078,7 +1156,7 @@ async def approve_v2ray_payment(client, callback_query):
         else:
             await callback_query.answer("شما اجازه این کار را ندارید.", show_alert=True)
     else:
-        await callback_query.answer("عملیات یا تایید یا رد شده توسط فرد دیگیری با منقضی شده.", show_alert=True)
+        await callback_query.answer("عملیات یا تایید یا رد شده یا توسط فرد دیگیری با منقضی شده.", show_alert=True)
         
 
 
@@ -1174,13 +1252,13 @@ async def my_configs(client, callback_query):
     chat_id = callback_query.from_user.id
 
     cursor.execute(
-        "SELECT license_key FROM purchases WHERE chat_id = ?", (chat_id,))
+        "SELECT config_text FROM configs WHERE chat_id = ?", (chat_id,))
     purchases = cursor.fetchall()
 
     if purchases:
         response = "کانفیگ‌های شما:\n"
         for purchase in purchases:
-            response += f"- {purchase[0]}\n"
+            response += f"- `{purchase[0]}`\n"
         await callback_query.message.reply_text(response)
     else:
         await callback_query.message.reply_text("شما هیچ کانفیگی خریداری نکرده‌اید.")
