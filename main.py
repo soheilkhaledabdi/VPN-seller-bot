@@ -603,11 +603,13 @@ async def profile(client, callback_query):
         "SELECT COUNT(*) FROM purchases WHERE chat_id = ?", (chat_id,))
     config_count = cursor.fetchone()[0]
 
+    formatted_balance = "{:,}".format(balance)
+
     # Prepare the profile message
     profile_message = (
         f"👤 پروفایل شما:\n\n"
         f"📝 نام: {name}\n"
-        f"💰 موجودی کیف پول: {balance} تومان\n"
+        f"💰 موجودی کیف پول: {formatted_balance} تومان\n"
         f"👥 تعداد ریفرال‌ها: {referral_count}\n"
         f"📁 تعداد کانفیگ‌ها: {config_count}\n"
     )
