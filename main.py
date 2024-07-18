@@ -374,7 +374,7 @@ async def gaming_tutorial_callback(client, callback_query):
 
 @app.on_callback_query(filters.regex("v2_tutorial"))
 async def v2_tutorial_callback(client, callback_query):
-    video_file_id = "BAACAgQAAxkBAAMzZpmV5Ss5CqGAzk3S-BEygiqcsAAkEUAAIm3sBQ0_d0khmxc1weBA"
+    video_file_id = "BAACAgQAAxkBAAOFZpmfMqSJSPS7gBQfw8T0FVLJjS8AAkEUAAIm3sBQ0_d0khmxc1weBA"
     caption = "آموزش V2 در اندروید و ایفون"
     await callback_query.message.reply_video(video_file_id, caption=caption)
 
