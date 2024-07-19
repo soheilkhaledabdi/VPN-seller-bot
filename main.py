@@ -1146,7 +1146,7 @@ async def approve_openvpn_payment(client, callback_query):
                 if config_row:
                     config_id, config_text = config_row
 
-                    cursor.execute("UPDATE configs SET status = 'sold' WHERE id = ?", (config_id,))
+                    cursor.execute("UPDATE configs SET status = 'sold', chat_id = ? WHERE id = ?",(user_chat_id, config_id))
                     conn.commit()
 
                     username, password = config_text.split(',')
