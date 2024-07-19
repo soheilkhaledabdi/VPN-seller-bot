@@ -1,6 +1,7 @@
-# Create by soheil khaledabadi 
-# Github   : https://github.com/soheilkhaledabdi
-# Telegram : @soheilkhaledabadi
+# Created by Soheil Khaledabadi
+# GitHub: https://github.com/soheilkhaledabdi
+# Telegram: @soheilkhaledabadi
+# Email: soheilkhaledabdi@gmail.com
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -187,6 +188,17 @@ async def start(client, message):
 
     if phone_number and phone_number[0]:
         args = message.text.split()
+        cursor.execute("SELECT COUNT(*) FROM users")
+        user_count = cursor.fetchone()[0]
+
+        # Fetch today's sales count
+        cursor.execute("""
+            SELECT COUNT(*) FROM configs
+            WHERE status = 'sell'
+        """)
+        sales_count_today = cursor.fetchone()[0]
+
+
         if len(args) > 1:
             referrer_id = int(args[1])
             cursor.execute(
@@ -214,7 +226,10 @@ async def start(client, message):
                                         [InlineKeyboardButton(
                                             "مدیریت فایل‌های کانفیگ 🗂", callback_data="manage_configs")],
                                         [InlineKeyboardButton(
-                                            "زیر مجموعه گیری 🔗", callback_data="referral_link")]
+                                            "زیر مجموعه گیری 🔗", callback_data="referral_link")],
+                                                    [InlineKeyboardButton(
+                                                    f"تعداد کاربران: {user_count} | فروش رفته: {sales_count_today} 📊", callback_data="stats")]
+                                        
                                     ]))
         else:
             await message.reply_text("شماره تماس شما با موفقیت ثبت شد! اکنون از منوهای زیر می‌توانید استفاده کنید:",
@@ -248,6 +263,55 @@ async def start(client, message):
             "👋🏻سلام به ربات خودتون خوش اومدید❤️\nلطفاً براش شروع شماره تماس خود را به اشتراک بگذارید.",
             reply_markup=keyboard
         )
+        
+@app.on_callback_query(filters.regex("stats"))
+async def show_stats(client, callback_query):
+    cursor.execute("SELECT COUNT(*) FROM users")
+    user_count = cursor.fetchone()[0]
+
+    cursor.execute("""
+        SELECT v2ray_plans.id, v2ray_plans.name, v2ray_plans.price, 
+               COUNT(configs.id) AS sold_count, 
+               COALESCE(SUM(v2ray_plans.price), 0) AS total_revenue
+        FROM v2ray_plans
+        LEFT JOIN configs ON v2ray_plans.id = configs.plan_id AND configs.plan_type = 'v2ray' AND configs.status = 'sold'
+        GROUP BY v2ray_plans.id
+    """)
+    v2ray_sales_stats = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT openvpn_plans.id, openvpn_plans.name, openvpn_plans.price, 
+               COUNT(configs.id) AS sold_count, 
+               COALESCE(SUM(openvpn_plans.price), 0) AS total_revenue
+        FROM openvpn_plans
+        LEFT JOIN configs ON openvpn_plans.id = configs.plan_id AND configs.plan_type = 'openvpn' AND configs.status = 'sold'
+        GROUP BY openvpn_plans.id
+    """)
+    openvpn_sales_stats = cursor.fetchall()
+
+    stats_text = f"📊 **آمار ربات** 📊\n\n"
+    stats_text += f"👥 تعداد کاربران: `{user_count}`\n"
+    stats_text += "---\n\n"
+
+    stats_text += "📦 **آمار فروش پلن‌های V2Ray** 📦:\n"
+    for plan_id, plan_name, plan_price, sold_count, total_revenue in v2ray_sales_stats:
+        total_revenue_display = total_revenue if sold_count > 0 else 0
+        stats_text += f"🔹 پلن: **{plan_name}**\n"
+        stats_text += f"🔸 تعداد فروش: `{sold_count}`\n"
+        stats_text += f"🔸 مجموع درآمد: `{total_revenue_display}` تومان\n"
+        stats_text += "---\n"
+
+    stats_text += "\n📦 **آمار فروش پلن‌های OpenVPN** 📦:\n"
+    for plan_id, plan_name, plan_price, sold_count, total_revenue in openvpn_sales_stats:
+        total_revenue_display = total_revenue if sold_count > 0 else 0
+        stats_text += f"🔹 پلن: **{plan_name}**\n"
+        stats_text += f"🔸 تعداد فروش: `{sold_count}`\n"
+        stats_text += f"🔸 مجموع درآمد: `{total_revenue_display}` تومان\n"
+        stats_text += "---\n"
+
+    await callback_query.message.edit_text(stats_text)
+
+
 
 
 @app.on_message(filters.command("download_db") & filters.private)
