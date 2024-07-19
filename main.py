@@ -7,6 +7,7 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from dotenv import load_dotenv
+from datetime import datetime,timedelta
 import sqlite3
 import qrcode
 import io
@@ -122,6 +123,14 @@ try:
 except sqlite3.OperationalError as e:
     pass
 
+
+try:
+    cursor.execute('''
+    ALTER TABLE configs
+    ADD COLUMN sale_date TEXT;
+    ''')
+except:
+    pass
 
 conn.commit()
 
@@ -264,54 +273,108 @@ async def start(client, message):
             reply_markup=keyboard
         )
         
+
 @app.on_callback_query(filters.regex("stats"))
 async def show_stats(client, callback_query):
     cursor.execute("SELECT COUNT(*) FROM users")
     user_count = cursor.fetchone()[0]
 
+    today = datetime.now().strftime('%Y-%m-%d')
+    start_of_month = (datetime.now().replace(day=1)).strftime('%Y-%m-%d')
+    start_of_last_month = (datetime.now().replace(day=1) - timedelta(days=1)).replace(day=1).strftime('%Y-%m-%d')
+    end_of_last_month = (datetime.now().replace(day=1) - timedelta(days=1)).strftime('%Y-%m-%d')
+
+    # آمار کلی فروش برای این ماه، امروز و ماه گذشته
+    cursor.execute("""
+        SELECT
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) = ? THEN 1 ELSE 0 END), 0) AS today_total_count,
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN 1 ELSE 0 END), 0) AS month_total_count,
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN 1 ELSE 0 END), 0) AS last_month_total_count,
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) = ? THEN v2ray_plans.price ELSE 0 END), 0) +
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN v2ray_plans.price ELSE 0 END), 0) AS today_total_revenue,
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN v2ray_plans.price ELSE 0 END), 0) +
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN v2ray_plans.price ELSE 0 END), 0) AS month_total_revenue,
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN v2ray_plans.price ELSE 0 END), 0) +
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN v2ray_plans.price ELSE 0 END), 0) AS last_month_total_revenue
+        FROM configs
+        LEFT JOIN v2ray_plans ON configs.plan_id = v2ray_plans.id AND configs.plan_type = 'v2ray' AND configs.status = 'sold'
+        LEFT JOIN openvpn_plans ON configs.plan_id = openvpn_plans.id AND configs.plan_type = 'openvpn' AND configs.status = 'sold'
+    """, (today, start_of_month, today, start_of_last_month, end_of_last_month, today, start_of_month, today, start_of_last_month, end_of_last_month, start_of_month, today, start_of_last_month, end_of_last_month, start_of_month, end_of_last_month))
+    total_stats = cursor.fetchone()
+
+    today_total_count, month_total_count, last_month_total_count, today_total_revenue, month_total_revenue, last_month_total_revenue = total_stats
+
+    # آمار فروش V2Ray
     cursor.execute("""
         SELECT v2ray_plans.id, v2ray_plans.name, v2ray_plans.price, 
                COUNT(configs.id) AS sold_count, 
-               COALESCE(SUM(v2ray_plans.price), 0) AS total_revenue
+               COALESCE(SUM(v2ray_plans.price), 0) AS total_revenue,
+               SUM(CASE WHEN DATE(configs.sale_date) = ? THEN 1 ELSE 0 END) AS today_sold_count,
+               SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN 1 ELSE 0 END) AS month_sold_count,
+               SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN 1 ELSE 0 END) AS last_month_sold_count
         FROM v2ray_plans
         LEFT JOIN configs ON v2ray_plans.id = configs.plan_id AND configs.plan_type = 'v2ray' AND configs.status = 'sold'
         GROUP BY v2ray_plans.id
-    """)
+    """, (today, start_of_month, today, start_of_last_month, end_of_last_month))
     v2ray_sales_stats = cursor.fetchall()
 
+    # آمار فروش OpenVPN
     cursor.execute("""
         SELECT openvpn_plans.id, openvpn_plans.name, openvpn_plans.price, 
                COUNT(configs.id) AS sold_count, 
-               COALESCE(SUM(openvpn_plans.price), 0) AS total_revenue
+               COALESCE(SUM(openvpn_plans.price), 0) AS total_revenue,
+               SUM(CASE WHEN DATE(configs.sale_date) = ? THEN 1 ELSE 0 END) AS today_sold_count,
+               SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN 1 ELSE 0 END) AS month_sold_count,
+               SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN 1 ELSE 0 END) AS last_month_sold_count
         FROM openvpn_plans
         LEFT JOIN configs ON openvpn_plans.id = configs.plan_id AND configs.plan_type = 'openvpn' AND configs.status = 'sold'
         GROUP BY openvpn_plans.id
-    """)
+    """, (today, start_of_month, today, start_of_last_month, end_of_last_month))
     openvpn_sales_stats = cursor.fetchall()
 
+    # بستن اتصال
+    conn.close()
+
+    # ساخت متن آمار
     stats_text = f"📊 **آمار ربات** 📊\n\n"
     stats_text += f"👥 تعداد کاربران: `{user_count}`\n"
     stats_text += "---\n\n"
 
+    # آمار کلی
+    stats_text += "📦 **آمار کلی فروش** 📦:\n"
+    stats_text += f"🔹 تعداد فروش امروز: `{today_total_count}`\n"
+    stats_text += f"🔹 مجموع درآمد امروز: `{today_total_revenue}` تومان\n"
+    stats_text += f"🔸 تعداد فروش این ماه: `{month_total_count}`\n"
+    stats_text += f"🔸 مجموع درآمد این ماه: `{month_total_revenue}` تومان\n"
+    stats_text += f"🔹 تعداد فروش ماه گذشته: `{last_month_total_count}`\n"
+    stats_text += f"🔹 مجموع درآمد ماه گذشته: `{last_month_total_revenue}` تومان\n"
+    stats_text += "---\n\n"
+
+    # آمار فروش V2Ray
     stats_text += "📦 **آمار فروش پلن‌های V2Ray** 📦:\n"
-    for plan_id, plan_name, plan_price, sold_count, total_revenue in v2ray_sales_stats:
+    for plan_id, plan_name, plan_price, sold_count, total_revenue, today_sold_count, month_sold_count, last_month_sold_count in v2ray_sales_stats:
         total_revenue_display = total_revenue if sold_count > 0 else 0
         stats_text += f"🔹 پلن: **{plan_name}**\n"
         stats_text += f"🔸 تعداد فروش: `{sold_count}`\n"
         stats_text += f"🔸 مجموع درآمد: `{total_revenue_display}` تومان\n"
+        stats_text += f"🔸 تعداد فروش امروز: `{today_sold_count}`\n"
+        stats_text += f"🔸 تعداد فروش این ماه: `{month_sold_count}`\n"
+        stats_text += f"🔸 تعداد فروش ماه گذشته: `{last_month_sold_count}`\n"
         stats_text += "---\n"
 
+    # آمار فروش OpenVPN
     stats_text += "\n📦 **آمار فروش پلن‌های OpenVPN** 📦:\n"
-    for plan_id, plan_name, plan_price, sold_count, total_revenue in openvpn_sales_stats:
+    for plan_id, plan_name, plan_price, sold_count, total_revenue, today_sold_count, month_sold_count, last_month_sold_count in openvpn_sales_stats:
         total_revenue_display = total_revenue if sold_count > 0 else 0
         stats_text += f"🔹 پلن: **{plan_name}**\n"
         stats_text += f"🔸 تعداد فروش: `{sold_count}`\n"
         stats_text += f"🔸 مجموع درآمد: `{total_revenue_display}` تومان\n"
+        stats_text += f"🔸 تعداد فروش امروز: `{today_sold_count}`\n"
+        stats_text += f"🔸 تعداد فروش این ماه: `{month_sold_count}`\n"
+        stats_text += f"🔸 تعداد فروش ماه گذشته: `{last_month_sold_count}`\n"
         stats_text += "---\n"
 
     await callback_query.message.edit_text(stats_text)
-
-
 
 
 @app.on_message(filters.command("download_db") & filters.private)
@@ -989,8 +1052,10 @@ async def confirm_purchase_openvpn(client, callback_query):
 
         if config_row:
             config_id, config_text = config_row
-            cursor.execute(
-                    "UPDATE configs SET status = 'sold', chat_id = ? WHERE id = ?",(user_id, config_id))
+            current_date = datetime.now().strftime('%Y-%m-%d')
+
+            cursor.execute("UPDATE configs SET status = 'sold', chat_id = ?, sale_date = ? WHERE id = ?",(user_id, current_date, config_id))
+
 
             conn.commit()
 
@@ -1111,8 +1176,9 @@ async def confirm_purchase_v2ray(client, callback_query):
         if config_row:
             config_id, config_text = config_row
             
-            cursor.execute(
-                "UPDATE configs SET status = 'sold', chat_id = ? WHERE id = ?",(user_id, config_id))
+            current_date = datetime.now().strftime('%Y-%m-%d')
+
+            cursor.execute("UPDATE configs SET status = 'sold', chat_id = ?, sale_date = ? WHERE id = ?",(user_id, current_date, config_id))
 
 
             conn.commit()
@@ -1210,7 +1276,9 @@ async def approve_openvpn_payment(client, callback_query):
                 if config_row:
                     config_id, config_text = config_row
 
-                    cursor.execute("UPDATE configs SET status = 'sold', chat_id = ? WHERE id = ?",(user_chat_id, config_id))
+                    current_date = datetime.now().strftime('%Y-%m-%d')
+                    cursor.execute("UPDATE configs SET status = 'sold', chat_id = ?, sale_date = ? WHERE id = ?",(user_id, current_date, config_id))
+
                     conn.commit()
 
                     username, password = config_text.split(',')
@@ -1250,7 +1318,10 @@ async def approve_v2ray_payment(client, callback_query):
                 if config_row:
                     config_id, config_text = config_row
 
-                    cursor.execute("UPDATE configs SET status = 'sold', chat_id = ? WHERE id = ?",(user_chat_id, config_id))
+                    current_date = datetime.now().strftime('%Y-%m-%d')
+
+                    cursor.execute(
+                    "UPDATE configs SET status = 'sold', chat_id = ?, sale_date = ? WHERE id = ?",(user_chat_id, current_date, config_id))
 
                     conn.commit()
 
@@ -1488,5 +1559,9 @@ async def download_configs(client, callback_query):
     except Exception as e:
         print(f"Database error: {e}")
         await callback_query.message.reply_text("خطایی در دسترسی به دیتابیس رخ داده است.")
+
+
+print(datetime.now().strftime('%Y-%m-%d'))
+
 
 app.run()
