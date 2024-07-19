@@ -1267,7 +1267,7 @@ async def approve_openvpn_payment(client, callback_query):
                     config_id, config_text = config_row
 
                     current_date = datetime.now().strftime('%Y-%m-%d')
-                    cursor.execute("UPDATE configs SET status = 'sold', chat_id = ?, sale_date = ? WHERE id = ?",(user_id, current_date, config_id))
+                    cursor.execute("UPDATE configs SET status = 'sold', chat_id = ?, sale_date = ? WHERE id = ?",(user_chat_id, current_date, config_id))
 
                     conn.commit()
 
