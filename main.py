@@ -194,7 +194,7 @@ async def start(client, message):
         # Fetch today's sales count
         cursor.execute("""
             SELECT COUNT(*) FROM configs
-            WHERE status = 'sell'
+            WHERE status = 'sold'
         """)
         sales_count_today = cursor.fetchone()[0]
 
