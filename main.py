@@ -272,8 +272,6 @@ async def start(client, message):
             "👋🏻سلام به ربات خودتون خوش اومدید❤️\nلطفاً براش شروع شماره تماس خود را به اشتراک بگذارید.",
             reply_markup=keyboard
         )
-        
-
 @app.on_callback_query(filters.regex("stats"))
 async def show_stats(client, callback_query):
     cursor.execute("SELECT COUNT(*) FROM users")
@@ -286,22 +284,22 @@ async def show_stats(client, callback_query):
 
     cursor.execute("""
         SELECT
-            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) = ? THEN 1 ELSE 0 END), 0) AS today_total_count,
-            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN 1 ELSE 0 END), 0) AS month_total_count,
-            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN 1 ELSE 0 END), 0) AS last_month_total_count,
             COALESCE(SUM(CASE WHEN DATE(configs.sale_date) = ? THEN v2ray_plans.price ELSE 0 END), 0) +
-            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN v2ray_plans.price ELSE 0 END), 0) AS today_total_revenue,
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) = ? THEN openvpn_plans.price ELSE 0 END), 0) AS today_total_revenue,
             COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN v2ray_plans.price ELSE 0 END), 0) +
-            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN v2ray_plans.price ELSE 0 END), 0) AS month_total_revenue,
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN openvpn_plans.price ELSE 0 END), 0) AS month_total_revenue,
             COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN v2ray_plans.price ELSE 0 END), 0) +
-            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN v2ray_plans.price ELSE 0 END), 0) AS last_month_total_revenue
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN openvpn_plans.price ELSE 0 END), 0) AS last_month_total_revenue,
+            COALESCE(COUNT(CASE WHEN DATE(configs.sale_date) = ? THEN 1 END), 0) AS today_total_count,
+            COALESCE(COUNT(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN 1 END), 0) AS month_total_count,
+            COALESCE(COUNT(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN 1 END), 0) AS last_month_total_count
         FROM configs
         LEFT JOIN v2ray_plans ON configs.plan_id = v2ray_plans.id AND configs.plan_type = 'v2ray' AND configs.status = 'sold'
         LEFT JOIN openvpn_plans ON configs.plan_id = openvpn_plans.id AND configs.plan_type = 'openvpn' AND configs.status = 'sold'
-    """, (today, start_of_month, today, start_of_last_month, end_of_last_month, today, start_of_month, today, start_of_last_month, end_of_last_month, start_of_month, today, start_of_last_month, end_of_last_month, start_of_month, end_of_last_month))
+    """, (today, today, start_of_month, today, start_of_month, today, start_of_last_month, end_of_last_month, start_of_last_month, end_of_last_month, today, start_of_month, today, start_of_last_month, end_of_last_month))
     total_stats = cursor.fetchone()
 
-    today_total_count, month_total_count, last_month_total_count, today_total_revenue, month_total_revenue, last_month_total_revenue = total_stats
+    today_total_revenue, month_total_revenue, last_month_total_revenue, today_total_count, month_total_count, last_month_total_count = total_stats
 
     cursor.execute("""
         SELECT v2ray_plans.id, v2ray_plans.name, v2ray_plans.price, 
@@ -330,38 +328,38 @@ async def show_stats(client, callback_query):
     openvpn_sales_stats = cursor.fetchall()
 
     stats_text = f"📊 **آمار ربات** 📊\n\n"
-    stats_text += f"👥 تعداد کاربران: `{user_count}`\n"
+    stats_text += f"👥 تعداد کاربران: `{user_count:,}`\n"
     stats_text += "---\n\n"
 
     stats_text += "📦 **آمار کلی فروش** 📦:\n"
-    stats_text += f"🔹 تعداد فروش امروز: `{today_total_count}`\n"
-    stats_text += f"🔹 مجموع درآمد امروز: `{today_total_revenue}` تومان\n"
-    stats_text += f"🔸 تعداد فروش این ماه: `{month_total_count}`\n"
-    stats_text += f"🔸 مجموع درآمد این ماه: `{month_total_revenue}` تومان\n"
-    stats_text += f"🔹 تعداد فروش ماه گذشته: `{last_month_total_count}`\n"
-    stats_text += f"🔹 مجموع درآمد ماه گذشته: `{last_month_total_revenue}` تومان\n"
+    stats_text += f"🔹 تعداد فروش امروز: `{today_total_count:,}`\n"
+    stats_text += f"🔹 مجموع درآمد امروز: `{today_total_revenue:,}` تومان\n"
+    stats_text += f"🔸 تعداد فروش این ماه: `{month_total_count:,}`\n"
+    stats_text += f"🔸 مجموع درآمد این ماه: `{month_total_revenue:,}` تومان\n"
+    stats_text += f"🔹 تعداد فروش ماه گذشته: `{last_month_total_count:,}`\n"
+    stats_text += f"🔹 مجموع درآمد ماه گذشته: `{last_month_total_revenue:,}` تومان\n"
     stats_text += "---\n\n"
 
     stats_text += "📦 **آمار فروش پلن‌های V2Ray** 📦:\n"
     for plan_id, plan_name, plan_price, sold_count, total_revenue, today_sold_count, month_sold_count, last_month_sold_count in v2ray_sales_stats:
         total_revenue_display = total_revenue if sold_count > 0 else 0
         stats_text += f"🔹 پلن: **{plan_name}**\n"
-        stats_text += f"🔸 تعداد فروش: `{sold_count}`\n"
-        stats_text += f"🔸 مجموع درآمد: `{total_revenue_display}` تومان\n"
-        stats_text += f"🔸 تعداد فروش امروز: `{today_sold_count}`\n"
-        stats_text += f"🔸 تعداد فروش این ماه: `{month_sold_count}`\n"
-        stats_text += f"🔸 تعداد فروش ماه گذشته: `{last_month_sold_count}`\n"
+        stats_text += f"🔸 تعداد فروش: `{sold_count:,}`\n"
+        stats_text += f"🔸 مجموع درآمد: `{total_revenue_display:,}` تومان\n"
+        stats_text += f"🔸 تعداد فروش امروز: `{today_sold_count:,}`\n"
+        stats_text += f"🔸 تعداد فروش این ماه: `{month_sold_count:,}`\n"
+        stats_text += f"🔸 تعداد فروش ماه گذشته: `{last_month_sold_count:,}`\n"
         stats_text += "---\n"
 
     stats_text += "\n📦 **آمار فروش پلن‌های OpenVPN** 📦:\n"
     for plan_id, plan_name, plan_price, sold_count, total_revenue, today_sold_count, month_sold_count, last_month_sold_count in openvpn_sales_stats:
         total_revenue_display = total_revenue if sold_count > 0 else 0
         stats_text += f"🔹 پلن: **{plan_name}**\n"
-        stats_text += f"🔸 تعداد فروش: `{sold_count}`\n"
-        stats_text += f"🔸 مجموع درآمد: `{total_revenue_display}` تومان\n"
-        stats_text += f"🔸 تعداد فروش امروز: `{today_sold_count}`\n"
-        stats_text += f"🔸 تعداد فروش این ماه: `{month_sold_count}`\n"
-        stats_text += f"🔸 تعداد فروش ماه گذشته: `{last_month_sold_count}`\n"
+        stats_text += f"🔸 تعداد فروش: `{sold_count:,}`\n"
+        stats_text += f"🔸 مجموع درآمد: `{total_revenue_display:,}` تومان\n"
+        stats_text += f"🔸 تعداد فروش امروز: `{today_sold_count:,}`\n"
+        stats_text += f"🔸 تعداد فروش این ماه: `{month_sold_count:,}`\n"
+        stats_text += f"🔸 تعداد فروش ماه گذشته: `{last_month_sold_count:,}`\n"
         stats_text += "---\n"
 
     await callback_query.message.edit_text(stats_text)
