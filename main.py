@@ -201,6 +201,8 @@ async def start(client, message):
     phone_number = cursor.fetchone()
 
     if phone_number and phone_number[0]:
+        print('HI')
+
         try:
             member = await client.get_chat_member(CHANNEL_ID, chat_id)
             print(member.status)
