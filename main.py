@@ -8,6 +8,8 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from dotenv import load_dotenv
 from datetime import datetime,timedelta
+from pyrogram.enums import ChatMemberStatus
+
 import sqlite3
 import qrcode
 import io
@@ -181,6 +183,9 @@ async def send_admin_message(admin_id, message_text, reply_markup=None):
 # Command handlers
 message_to_delete = None
 
+CHANNEL_ID = -1002210000780
+CHANNEL_LINK = "https://t.me/fifiishop"
+
 @app.on_message(filters.command("start") & filters.private)
 async def start(client, message):
     global message_to_delete 
@@ -196,17 +201,33 @@ async def start(client, message):
     phone_number = cursor.fetchone()
 
     if phone_number and phone_number[0]:
+        try:
+            member = await client.get_chat_member(CHANNEL_ID, chat_id)
+            print(member.status)
+            print(member.status != 'ChatMemberStatus.MEMBER')
+            
+            if member.status not in [ChatMemberStatus.MEMBER,ChatMemberStatus.OWNER,ChatMemberStatus.ADMINISTRATOR]:
+                raise Exception("Not a member")
+        except:
+            keyboard = InlineKeyboardMarkup(
+                [[InlineKeyboardButton("عضویت در کانال 📢", url=CHANNEL_LINK)]]
+            )
+            await message.reply_text(
+                "برای استفاده از ربات، باید در کانال ما عضو شوید و دوباره مجدد ربات استارت بزنید",
+                reply_markup=keyboard
+            )
+            return
+
+
         args = message.text.split()
         cursor.execute("SELECT COUNT(*) FROM users")
         user_count = cursor.fetchone()[0]
 
-        # Fetch today's sales count
         cursor.execute("""
             SELECT COUNT(*) FROM configs
             WHERE status = 'sold'
         """)
         sales_count_today = cursor.fetchone()[0]
-
 
         if len(args) > 1:
             referrer_id = int(args[1])
@@ -236,9 +257,8 @@ async def start(client, message):
                                             "مدیریت فایل‌های کانفیگ 🗂", callback_data="manage_configs")],
                                         [InlineKeyboardButton(
                                             "زیر مجموعه گیری 🔗", callback_data="referral_link")],
-                                                    [InlineKeyboardButton(
-                                                    f"تعداد کاربران: {user_count} | فروش رفته: {sales_count_today} 📊", callback_data="stats")]
-                                        
+                                        [InlineKeyboardButton(
+                                            f"تعداد کاربران: {user_count} | فروش رفته: {sales_count_today} 📊", callback_data="stats")]
                                     ]))
         else:
             await message.reply_text("شماره تماس شما با موفقیت ثبت شد! اکنون از منوهای زیر می‌توانید استفاده کنید:",
@@ -261,6 +281,8 @@ async def start(client, message):
                                      "ارتباط با پشتیبانی  📞", callback_data="support_id"),
                                   InlineKeyboardButton(
                                      "آموزش 📚", callback_data="tutorials")],
+                                 [InlineKeyboardButton(
+                                     "آموزش استفاده از ربات 🤖", callback_data="bot_amozesh")],
                              ]))
 
     else:
@@ -410,6 +432,8 @@ async def contact(client, message):
                                      "ارتباط با پشتیبانی  📞", callback_data="support_id"),
                                   InlineKeyboardButton(
                                      "آموزش 📚", callback_data="tutorials")],
+                                                                  [InlineKeyboardButton(
+                                     "آموزش استفاده از ربات 🤖", callback_data="tutorials_bot")],
                              ]))
 
 
@@ -458,6 +482,8 @@ async def start(client, callback_query):
                     "ارتباط با پشتیبانی  📞", callback_data="support_id"),
                  InlineKeyboardButton(
                     "آموزش 📚", callback_data="tutorials")]
+                                                 [InlineKeyboardButton(
+                                     "آموزش استفاده از ربات 🤖", callback_data="bot_amozesh")],
                 ])
         )
 
@@ -476,6 +502,13 @@ async def tutorials_callback(client, callback_query):
             [InlineKeyboardButton("آموزش سرویس V2ray 📲", callback_data="v2_tutorial")]
         ])
     )
+    
+@app.on_callback_query(filters=filters.regex('bot_amozesh'))
+async def tutorials_bot_callback(client, callback_query):
+    video_file_id = "BAACAgQAAxkBAAI8LWab2sxOrTbTwyJOo5jBU6biDMqAAALlFQACs-nZUECFMSqz0ASpHgQ"
+    caption = "اموزش کامل ربات همه چیو براتون توضیح دادم❤️🫢\nهرسوالی داشتید به پشتیبانی پیام بدید\n\n @FifiSupport"
+    await callback_query.message.reply_video(video_file_id, caption=caption)
+
 
 @app.on_callback_query(filters.regex("tutorials"))
 async def tutorials_callback(client, callback_query):
