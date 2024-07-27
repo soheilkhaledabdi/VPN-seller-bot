@@ -10,162 +10,140 @@ from dotenv import load_dotenv
 from datetime import datetime,timedelta
 from pyrogram.enums import ChatMemberStatus
 
-import mysql.connector
 import sqlite3
 import qrcode
 import io
 import os
 
 
-load_dotenv()
-# Retrieve environment variables with default values
-host = os.getenv("HOST", "127.0.0.1")
-username = os.getenv("USERNAME", "root")
-password = os.getenv("PASSWORD", "")
-database = os.getenv("DATABASE", "fifi")
-
-# Debugging: Print the values to ensure they are set correctly
-print(f"Host: {host}")
-print(f"Username: {username}")
-print(f"Password: {password}")
-print(f"Database: {database}")
-
-# Check if any of the critical environment variables are None
-if None in (host, username, password, database):
-    raise ValueError("One or more environment variables are not set correctly.")
-
-conn = mysql.connector.connect(
-    host=host,
-    user=username,
-    password=password,
-    database=database
-)
-
-cursor = conn.cursor(buffered=True)
-
-
+conn = sqlite3.connect('database.db')
 cursor = conn.cursor()
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS users (
-                    chat_id INT PRIMARY KEY,
-                    name VARCHAR(255))''')
+                    chat_id INTEGER PRIMARY KEY,
+                    name TEXT)''')
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS licenses (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    license_key VARCHAR(255),
-                    status VARCHAR(255),
-                    chat_id INT,
-                    purchase_id INT,
-                    config_type VARCHAR(255),
-                    plan_type ENUM('openvpn', 'v2ray'))''')
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    license_key TEXT,
+                    status TEXT,
+                    chat_id INTEGER,
+                    purchase_id INTEGER)''')
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS purchases (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    chat_id INT,
-                    license_key VARCHAR(255),
-                    status VARCHAR(255),
-                    purchase_id INT)''')
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    chat_id INTEGER,
+                    license_key TEXT,
+                    status TEXT)''')
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS config_files (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    file_id VARCHAR(255),
-                    file_name VARCHAR(255))''')
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    file_id TEXT,
+                    file_name TEXT)''')
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS wallets (
-                    user_id INT PRIMARY KEY,
-                    balance DECIMAL(10, 2))''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS wallets
+                  (user_id INTEGER PRIMARY KEY, balance REAL)''')
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS referrals (
-                    user_id INT PRIMARY KEY,
-                    referrer_id INT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS referrals
+                  (user_id INTEGER PRIMARY KEY, referrer_id INTEGER)''')
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS openvpn_plans (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL,
-                    price INT)''')
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS openvpn_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL
+)
+''')
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS v2ray_plans (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL,
-                    price INT)''')
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS v2ray_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL
+)
+''')
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS configs (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    plan_id INT,
-                    plan_type VARCHAR(255),
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    plan_id INTEGER,
+                    plan_type TEXT,
                     config_text TEXT,
-                    status VARCHAR(255) DEFAULT 'available',
-                    chat_id INT,
-                    sale_date DATE,
-                    FOREIGN KEY(plan_id) REFERENCES licenses(id))''')
+                    FOREIGN KEY(plan_id) REFERENCES licenses(id)
+                )''')
 
-# Handle ALTER TABLE commands
-try:
-    cursor.execute('ALTER TABLE licenses ADD COLUMN chat_id INT')
-except mysql.connector.Error as e:
-    if e.errno != 1060:  # Ignore if column already exists
-        print(e)
 
 try:
-    cursor.execute('ALTER TABLE purchases ADD COLUMN purchase_id INT')
-except mysql.connector.Error as e:
-    if e.errno != 1060:  # Ignore if column already exists
-        print(e)
+    cursor.execute('ALTER TABLE licenses ADD COLUMN chat_id INTEGER')
+except sqlite3.OperationalError:
+    pass
 
 try:
-    cursor.execute('ALTER TABLE licenses ADD COLUMN config_type VARCHAR(255)')
-except mysql.connector.Error as e:
-    if e.errno != 1060:  # Ignore if column already exists
-        print(e)
+    cursor.execute('ALTER TABLE purchases ADD COLUMN purchase_id INTEGER')
+except sqlite3.OperationalError:
+    pass
+
+try:
+    cursor.execute('ALTER TABLE licenses ADD COLUMN config_type TEXT')
+except sqlite3.OperationalError:
+    pass
 
 try:
     cursor.execute('''ALTER TABLE licenses
-                      ADD COLUMN plan_type ENUM('openvpn', 'v2ray')''')
-except mysql.connector.Error as e:
-    if e.errno != 1060:  # Ignore if column already exists
-        print(e)
+                  ADD COLUMN plan_type TEXT CHECK(plan_type IN ('openvpn', 'v2ray'))''')
+except sqlite3.OperationalError:
+    pass
 
 try:
-    cursor.execute('ALTER TABLE configs ADD COLUMN status VARCHAR(255) DEFAULT "available"')
-except mysql.connector.Error as e:
-    if e.errno != 1060:  # Ignore if column already exists
-        print(e)
+    cursor.execute('''
+                   ALTER TABLE configs ADD COLUMN status TEXT DEFAULT 'available';
+                   ''')
+except sqlite3.OperationalError:
+    pass
+
 
 try:
-    cursor.execute('ALTER TABLE openvpn_plans ADD COLUMN price INT')
-except mysql.connector.Error as e:
-    if e.errno != 1060:  # Ignore if column already exists
-        print(e)
+    cursor.execute('''
+                   ALTER TABLE openvpn_plans ADD COLUMN price INTEGER;
+                   ''')
+except sqlite3.OperationalError:
+    pass
 
 try:
-    cursor.execute('ALTER TABLE v2ray_plans ADD COLUMN price INT')
-except mysql.connector.Error as e:
-    if e.errno != 1060:  # Ignore if column already exists
-        print(e)
+    cursor.execute('''
+                   ALTER TABLE v2ray_plans ADD COLUMN price INTEGER;
+                   ''')
+except sqlite3.OperationalError:
+    pass
 
 try:
-    cursor.execute('ALTER TABLE configs ADD COLUMN chat_id INT')
-except mysql.connector.Error as e:
-    if e.errno != 1060:  # Ignore if column already exists
-        print(e)
+    cursor.execute('''
+    ALTER TABLE configs ADD COLUMN chat_id INTEGER NULL;
+    ''')
+except sqlite3.OperationalError:
+    pass
 
 try:
-    cursor.execute("ALTER TABLE users ADD COLUMN phone_number VARCHAR(255)")
-except mysql.connector.Error as e:
-    if e.errno != 1060:  # Ignore if column already exists
-        print(e)
+    cursor.execute("ALTER TABLE users ADD COLUMN phone_number TEXT")
+except sqlite3.OperationalError as e:
+    pass
+
 
 try:
-    cursor.execute('ALTER TABLE configs ADD COLUMN sale_date DATE')
-except mysql.connector.Error as e:
-    if e.errno != 1060:  # Ignore if column already exists
-        print(e)
+    cursor.execute('''
+    ALTER TABLE configs
+    ADD COLUMN sale_date TEXT;
+    ''')
+except:
+    pass
 
+conn.commit()
 
 # end database
 
 # Admin list ides
 ADMIN_IDS = [1734062356, 799574527, 6171236939,5973267660,6171236939,624982815,494197025]
+
+
+load_dotenv()
+
 
 # Retrieve environment variables with default values
 bot_name = os.getenv("BOT_NAME", "default_bot_name")
@@ -207,6 +185,7 @@ message_to_delete = None
 
 CHANNEL_ID = -1002210000780
 CHANNEL_LINK = "https://t.me/fifiishop"
+
 @app.on_message(filters.command("start") & filters.private)
 async def start(client, message):
     global message_to_delete 
@@ -214,22 +193,22 @@ async def start(client, message):
     name = message.from_user.first_name
 
     cursor.execute(
-        "INSERT IGNORE INTO users (chat_id, name) VALUES (%s, %s)", (chat_id, name))
+        "INSERT OR IGNORE INTO users (chat_id, name) VALUES (?, ?)", (chat_id, name))
     conn.commit()
 
     cursor.execute(
-        "SELECT phone_number FROM users WHERE chat_id = %s", (chat_id,))
+        "SELECT phone_number FROM users WHERE chat_id = ?", (chat_id,))
     phone_number = cursor.fetchone()
 
     if phone_number and phone_number[0]:
+        print('HI')
 
-        # Commented out for now
         # try:
         #     member = await client.get_chat_member(CHANNEL_ID, chat_id)
         #     print(member.status)
         #     print(member.status != 'ChatMemberStatus.MEMBER')
             
-        #     if member.status not in ['member', 'administrator', 'creator']:
+        #     if member.status not in [ChatMemberStatus.MEMBER,ChatMemberStatus.OWNER,ChatMemberStatus.ADMINISTRATOR]:
         #         raise Exception("Not a member")
         # except:
         #     keyboard = InlineKeyboardMarkup(
@@ -241,36 +220,30 @@ async def start(client, message):
         #     )
         #     return
 
+
         args = message.text.split()
+        cursor.execute("SELECT COUNT(*) FROM users")
+        user_count = cursor.fetchone()[0]
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM configs
+            WHERE status = 'sold'
+        """)
+        sales_count_today = cursor.fetchone()[0]
 
         if len(args) > 1:
             referrer_id = int(args[1])
             cursor.execute(
-                "SELECT referrer_id FROM referrals WHERE user_id = %s", (chat_id,))
+                "SELECT referrer_id FROM referrals WHERE user_id = ?", (chat_id,))
             referrer = cursor.fetchone()
-
-            # Fetch all results or handle accordingly
-            if cursor.with_rows:
-                cursor.fetchall()
 
             if not referrer:
                 cursor.execute(
-                    "INSERT IGNORE INTO referrals (user_id, referrer_id) VALUES (%s, %s)", (chat_id, referrer_id))
+                    "INSERT OR IGNORE INTO referrals (user_id, referrer_id) VALUES (?, ?)", (chat_id, referrer_id))
                 conn.commit()
                 await message.reply_text("🎉 شما از طریق لینک معرفی وارد شده‌اید. خوش آمدید! 🎉")
 
         if chat_id in ADMIN_IDS:
-            cursor.execute("SELECT COUNT(*) FROM users")
-            print(cursor.fetchone())
-            print("--------------------")
-            user_count = cursor.fetchone()[0]
-
-            cursor.execute("""
-                SELECT COUNT(*) FROM configs
-                WHERE status = 'sold'
-            """)
-            sales_count_today = cursor.fetchone()[0]
-
             user_states[chat_id] = "admin_logged_in"
             await message.reply_text("✅ سلام عزیزم به بخش ادمین خوش اومدی از منو های زیر برای مدیریت ربات استفاده بکن!",
                                     reply_markup=InlineKeyboardMarkup([
@@ -296,8 +269,8 @@ async def start(client, message):
                                      "پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
                                  [InlineKeyboardButton(
                                      "خرید سرویس گیمینگ 🎮", callback_data="shop_openvpn")],
-                                 [InlineKeyboardButton(
-                                     "خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="shop_v2ray")],
+                                #  [InlineKeyboardButton(
+                                #      "خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="shop_v2ray")],
                                  [InlineKeyboardButton(
                                      "خرید های من 🛍️", callback_data="my_configs")],
                                  [InlineKeyboardButton(
@@ -313,6 +286,7 @@ async def start(client, message):
                                  [InlineKeyboardButton(
                                      "آموزش استفاده از ربات 🤖", callback_data="bot_amozesh")],
                              ]))
+
     else:
         keyboard = ReplyKeyboardMarkup(
             [[KeyboardButton("اشتراک‌گذاری شماره ☎️", request_contact=True)]],
@@ -322,7 +296,6 @@ async def start(client, message):
             "👋🏻سلام به ربات خودتون خوش اومدید❤️\nلطفاً براش شروع شماره تماس خود را به اشتراک بگذارید.",
             reply_markup=keyboard
         )
-        
 @app.on_callback_query(filters.regex("stats"))
 async def show_stats(client, callback_query):
     cursor.execute("SELECT COUNT(*) FROM users")
@@ -335,15 +308,15 @@ async def show_stats(client, callback_query):
 
     cursor.execute("""
         SELECT
-            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) = %s THEN v2ray_plans.price ELSE 0 END), 0) +
-            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) = %s THEN openvpn_plans.price ELSE 0 END), 0) AS today_total_revenue,
-            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= %s AND DATE(configs.sale_date) < %s THEN v2ray_plans.price ELSE 0 END), 0) +
-            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= %s AND DATE(configs.sale_date) < %s THEN openvpn_plans.price ELSE 0 END), 0) AS month_total_revenue,
-            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= %s AND DATE(configs.sale_date) < %s THEN v2ray_plans.price ELSE 0 END), 0) +
-            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= %s AND DATE(configs.sale_date) < %s THEN openvpn_plans.price ELSE 0 END), 0) AS last_month_total_revenue,
-            COALESCE(COUNT(CASE WHEN DATE(configs.sale_date) = %s THEN 1 END), 0) AS today_total_count,
-            COALESCE(COUNT(CASE WHEN DATE(configs.sale_date) >= %s AND DATE(configs.sale_date) < %s THEN 1 END), 0) AS month_total_count,
-            COALESCE(COUNT(CASE WHEN DATE(configs.sale_date) >= %s AND DATE(configs.sale_date) < %s THEN 1 END), 0) AS last_month_total_count
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) = ? THEN v2ray_plans.price ELSE 0 END), 0) +
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) = ? THEN openvpn_plans.price ELSE 0 END), 0) AS today_total_revenue,
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN v2ray_plans.price ELSE 0 END), 0) +
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN openvpn_plans.price ELSE 0 END), 0) AS month_total_revenue,
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN v2ray_plans.price ELSE 0 END), 0) +
+            COALESCE(SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN openvpn_plans.price ELSE 0 END), 0) AS last_month_total_revenue,
+            COALESCE(COUNT(CASE WHEN DATE(configs.sale_date) = ? THEN 1 END), 0) AS today_total_count,
+            COALESCE(COUNT(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN 1 END), 0) AS month_total_count,
+            COALESCE(COUNT(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN 1 END), 0) AS last_month_total_count
         FROM configs
         LEFT JOIN v2ray_plans ON configs.plan_id = v2ray_plans.id AND configs.plan_type = 'v2ray' AND configs.status = 'sold'
         LEFT JOIN openvpn_plans ON configs.plan_id = openvpn_plans.id AND configs.plan_type = 'openvpn' AND configs.status = 'sold'
@@ -356,9 +329,9 @@ async def show_stats(client, callback_query):
         SELECT v2ray_plans.id, v2ray_plans.name, v2ray_plans.price, 
                COUNT(configs.id) AS sold_count, 
                COALESCE(SUM(v2ray_plans.price), 0) AS total_revenue,
-               SUM(CASE WHEN DATE(configs.sale_date) = %s THEN 1 ELSE 0 END) AS today_sold_count,
-               SUM(CASE WHEN DATE(configs.sale_date) >= %s AND DATE(configs.sale_date) < %s THEN 1 ELSE 0 END) AS month_sold_count,
-               SUM(CASE WHEN DATE(configs.sale_date) >= %s AND DATE(configs.sale_date) < %s THEN 1 ELSE 0 END) AS last_month_sold_count
+               SUM(CASE WHEN DATE(configs.sale_date) = ? THEN 1 ELSE 0 END) AS today_sold_count,
+               SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN 1 ELSE 0 END) AS month_sold_count,
+               SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN 1 ELSE 0 END) AS last_month_sold_count
         FROM v2ray_plans
         LEFT JOIN configs ON v2ray_plans.id = configs.plan_id AND configs.plan_type = 'v2ray' AND configs.status = 'sold'
         GROUP BY v2ray_plans.id
@@ -369,9 +342,9 @@ async def show_stats(client, callback_query):
         SELECT openvpn_plans.id, openvpn_plans.name, openvpn_plans.price, 
                COUNT(configs.id) AS sold_count, 
                COALESCE(SUM(openvpn_plans.price), 0) AS total_revenue,
-               SUM(CASE WHEN DATE(configs.sale_date) = %s THEN 1 ELSE 0 END) AS today_sold_count,
-               SUM(CASE WHEN DATE(configs.sale_date) >= %s AND DATE(configs.sale_date) < %s THEN 1 ELSE 0 END) AS month_sold_count,
-               SUM(CASE WHEN DATE(configs.sale_date) >= %s AND DATE(configs.sale_date) < %s THEN 1 ELSE 0 END) AS last_month_sold_count
+               SUM(CASE WHEN DATE(configs.sale_date) = ? THEN 1 ELSE 0 END) AS today_sold_count,
+               SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN 1 ELSE 0 END) AS month_sold_count,
+               SUM(CASE WHEN DATE(configs.sale_date) >= ? AND DATE(configs.sale_date) < ? THEN 1 ELSE 0 END) AS last_month_sold_count
         FROM openvpn_plans
         LEFT JOIN configs ON openvpn_plans.id = configs.plan_id AND configs.plan_type = 'openvpn' AND configs.status = 'sold'
         GROUP BY openvpn_plans.id
@@ -435,7 +408,7 @@ async def contact(client, message):
     phone_number = message.contact.phone_number
 
     cursor.execute(
-        "UPDATE users SET phone_number = %s WHERE chat_id = %s", (phone_number, chat_id))
+        "UPDATE users SET phone_number = ? WHERE chat_id = ?", (phone_number, chat_id))
     conn.commit()
 
     if message_to_delete:
@@ -447,8 +420,8 @@ async def contact(client, message):
                                      "پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
                                  [InlineKeyboardButton(
                                      "خرید سرویس گیمینگ 🎮", callback_data="shop_openvpn")],
-                                 [InlineKeyboardButton(
-                                     "خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="shop_v2ray")],
+                                #  [InlineKeyboardButton(
+                                #      "خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="shop_v2ray")],
                                  [InlineKeyboardButton(
                                      "خرید های من 🛍️", callback_data="my_configs")],
                                  [InlineKeyboardButton(
@@ -465,7 +438,6 @@ async def contact(client, message):
                                      "آموزش استفاده از ربات 🤖", callback_data="tutorials_bot")],
                              ]))
 
-
 @app.on_callback_query(filters.regex("go_home"))
 async def start(client, callback_query):
     chat_id = callback_query.from_user.id
@@ -475,45 +447,29 @@ async def start(client, callback_query):
         await callback_query.message.edit_text(
             "✅ سلام عزیزم به بخش ادمین خوش اومدی از منو های زیر برای مدیریت ربات استفاده بکن!",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton(
-                    "پروفایل من 👩🏼‍💻🧑🏻‍💻 ", callback_data="profile")],
-                [InlineKeyboardButton(
-                    "کانفیگ‌های فروش رفته 💼", callback_data="sold_configs")],
-                [InlineKeyboardButton("کانفیگ OpenVPN ➕",
-                                      callback_data="openvpn_config")],
-                [InlineKeyboardButton(
-                    "کانفیگ V2Ray ➕", callback_data="v2ray_config")],
-                [InlineKeyboardButton(
-                    "مدیریت فایل‌های کانفیگ 🗂", callback_data="manage_configs")],
-                [InlineKeyboardButton(
-                    "زیر مجموعه گیری 🔗", callback_data="referral_link")]
+                [InlineKeyboardButton("پروفایل من 👩🏼‍💻🧑🏻‍💻 ", callback_data="profile")],
+                [InlineKeyboardButton("کانفیگ‌های فروش رفته 💼", callback_data="sold_configs")],
+                [InlineKeyboardButton("کانفیگ OpenVPN ➕", callback_data="openvpn_config")],
+                [InlineKeyboardButton("کانفیگ V2Ray ➕", callback_data="v2ray_config")],
+                [InlineKeyboardButton("مدیریت فایل‌های کانفیگ 🗂", callback_data="manage_configs")],
+                [InlineKeyboardButton("زیر مجموعه گیری 🔗", callback_data="referral_link")]
             ])
         )
     else:
         await callback_query.message.edit_text(
             "👋🏻سلام به ربات خودتون خوش اومدید❤️\nاز منو های زیر جهت خرید میتونید استفاده کنید🤗❤️",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton(
-                    "پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
-                [InlineKeyboardButton(
-                    "خرید سرویس گیمینگ 🎮", callback_data="shop_openvpn")],
-                [InlineKeyboardButton(
-                    "خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="shop_v2ray")],
-                [InlineKeyboardButton(
-                    "خرید های من", callback_data="my_configs")],
-                [InlineKeyboardButton(
-                    "دانلود کانفیگ های OpenVPN گیمینگ 📥", callback_data="download_configs")],
-                [InlineKeyboardButton(
-                    " افزایش موجودی کیف پول 💰", callback_data="add_amount")],
-                [InlineKeyboardButton(
-                    " زیر مجموعه گیری 🔗", callback_data="referral_link")],
-                [InlineKeyboardButton(
-                    "ارتباط با پشتیبانی  📞", callback_data="support_id"),
-                 InlineKeyboardButton(
-                    "آموزش 📚", callback_data="tutorials")]
-                                                 [InlineKeyboardButton(
-                                     "آموزش استفاده از ربات 🤖", callback_data="bot_amozesh")],
-                ])
+                [InlineKeyboardButton("پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
+                [InlineKeyboardButton("خرید سرویس گیمینگ 🎮", callback_data="shop_openvpn")],
+                # [InlineKeyboardButton("خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="shop_v2ray")],
+                [InlineKeyboardButton("خرید های من", callback_data="my_configs")],
+                [InlineKeyboardButton("دانلود کانفیگ های OpenVPN گیمینگ 📥", callback_data="download_configs")],
+                [InlineKeyboardButton(" افزایش موجودی کیف پول 💰", callback_data="add_amount")],
+                [InlineKeyboardButton(" زیر مجموعه گیری 🔗", callback_data="referral_link")],
+                [InlineKeyboardButton("ارتباط با پشتیبانی  📞", callback_data="support_id"),
+                 InlineKeyboardButton("آموزش 📚", callback_data="tutorials")],
+                [InlineKeyboardButton("آموزش استفاده از ربات 🤖", callback_data="bot_amozesh")]
+            ])
         )
 
 
@@ -718,7 +674,7 @@ async def handle_private_message(client, message):
 
                 try:
                     for config_text in config_lines:
-                        cursor.execute("INSERT INTO configs (plan_id, plan_type, config_text) VALUES (%s, %s, %s)",
+                        cursor.execute("INSERT INTO configs (plan_id, plan_type, config_text) VALUES (?, ?, ?)",
                                        (plan_id, type_of_plan, config_text.strip()))
                     conn.commit()
                     await message.reply_text("کانفیگ‌ها با موفقیت اضافه شدند.")
@@ -740,7 +696,7 @@ async def handle_private_message(client, message):
                         price = int(text)
                         plan_name = user_states[chat_id]["name"]
                         cursor.execute(
-                            "INSERT INTO openvpn_plans (name, price) VALUES (%s, %s)", (plan_name, price))
+                            "INSERT INTO openvpn_plans (name, price) VALUES (?, ?)", (plan_name, price))
                         conn.commit()
                         await message.reply_text(f"پلن OpenVPN با نام {plan_name} و قیمت {price} تومان با موفقیت اضافه شد ✅")
                     except ValueError:
@@ -761,7 +717,7 @@ async def handle_private_message(client, message):
                         price = int(text)
                         plan_name = user_states[chat_id]["name"]
                         cursor.execute(
-                            "INSERT INTO v2ray_plans (name, price) VALUES (%s, %s)", (plan_name, price))
+                            "INSERT INTO v2ray_plans (name, price) VALUES (?, ?)", (plan_name, price))
                         conn.commit()
                         await message.reply_text(f"پلن V2Ray با نام {plan_name} و قیمت {price} تومان با موفقیت اضافه شد ✅")
                     except ValueError:
@@ -782,14 +738,14 @@ async def handle_private_message(client, message):
             licenses = text.split('\n')
             for license_key in licenses:
                 cursor.execute(
-                    "INSERT INTO licenses (license_key, status, purchase_id) VALUES (%s, 'set', NULL)", (license_key,))
+                    "INSERT INTO licenses (license_key, status, purchase_id) VALUES (?, 'set', NULL)", (license_key,))
             conn.commit()
             user_states[chat_id] = "admin_logged_in"
             await message.reply_text("کانفیگ‌های جدید اضافه شدند➕✅")
 
         elif state == "admin_logged_in":
             cursor.execute(
-                "INSERT INTO licenses (license_key, status, purchase_id) VALUES (%s, 'set', NULL)", (text,))
+                "INSERT INTO licenses (license_key, status, purchase_id) VALUES (?, 'set', NULL)", (text,))
             conn.commit()
             await message.reply_text("کانفیگ جدید اضافه شد➕✅")
     else:
@@ -800,7 +756,7 @@ async def handle_private_message(client, message):
 async def profile(client, callback_query):
     chat_id = callback_query.from_user.id
     try:
-        cursor.execute("SELECT name FROM users WHERE chat_id = %s", (chat_id,))
+        cursor.execute("SELECT name FROM users WHERE chat_id = ?", (chat_id,))
         user_profile = cursor.fetchone()
     except sqlite3.OperationalError as e:
         await callback_query.answer("خطا در دریافت پروفایل. لطفاً بعداً تلاش کنید.", show_alert=True)
@@ -814,18 +770,18 @@ async def profile(client, callback_query):
         return
 
     # Fetch wallet balance
-    cursor.execute("SELECT balance FROM wallets WHERE user_id = %s", (chat_id,))
+    cursor.execute("SELECT balance FROM wallets WHERE user_id = ?", (chat_id,))
     wallet = cursor.fetchone()
     balance = wallet[0] if wallet else 0
 
     # Fetch referral count
     cursor.execute(
-        "SELECT COUNT(*) FROM referrals WHERE referrer_id = %s", (chat_id,))
+        "SELECT COUNT(*) FROM referrals WHERE referrer_id = ?", (chat_id,))
     referral_count = cursor.fetchone()[0]
 
     # Fetch configuration count
     cursor.execute(
-        "SELECT COUNT(*) FROM purchases WHERE chat_id = %s", (chat_id,))
+        "SELECT COUNT(*) FROM purchases WHERE chat_id = ?", (chat_id,))
     config_count = cursor.fetchone()[0]
 
     formatted_balance = "{:,}".format(balance)
@@ -975,20 +931,20 @@ async def handle_admin_response(client, callback_query):
         if action == "confirm":
             amount = pending_transactions[user_id]["amount"]
             cursor.execute(
-                "INSERT OR IGNORE INTO wallets (user_id, balance) VALUES (%s, %s)", (user_id, 0))
+                "INSERT OR IGNORE INTO wallets (user_id, balance) VALUES (?, ?)", (user_id, 0))
             cursor.execute(
-                "UPDATE wallets SET balance = balance + %s WHERE user_id = %s", (amount, user_id))
+                "UPDATE wallets SET balance = balance + ? WHERE user_id = ?", (amount, user_id))
             conn.commit()
 
             cursor.execute(
-                "SELECT referrer_id FROM referrals WHERE user_id = %s", (user_id,))
+                "SELECT referrer_id FROM referrals WHERE user_id = ?", (user_id,))
             referrer_id = cursor.fetchone()
             if referrer_id:
                 referrer_id = referrer_id[0]
                 cursor.execute(
-                    "INSERT OR IGNORE INTO wallets (user_id, balance) VALUES (%s, %s)", (referrer_id, 0))
+                    "INSERT OR IGNORE INTO wallets (user_id, balance) VALUES (?, ?)", (referrer_id, 0))
                 cursor.execute(
-                    "UPDATE wallets SET balance = balance + 10000 WHERE user_id = %s", (referrer_id,))
+                    "UPDATE wallets SET balance = balance + 10000 WHERE user_id = ?", (referrer_id,))
                 conn.commit()
                 await client.send_message(chat_id=referrer_id, text="یک کاربر از زیر مجموعه شما خرید انجام داده است. 10000 تومان به کیف پول شما اضافه شد.")
 
@@ -1053,7 +1009,7 @@ async def process_buy_config_open(client, callback_query):
     
     cursor.execute("""
         SELECT COUNT(*) FROM configs 
-        WHERE plan_id = %s AND plan_type = 'openvpn' AND status = 'available'
+        WHERE plan_id = ? AND plan_type = 'openvpn' AND status = 'available'
     """, (plan_id,))
     available_count = cursor.fetchone()[0]
 
@@ -1061,7 +1017,7 @@ async def process_buy_config_open(client, callback_query):
         await callback_query.answer("هیچ کانفیگی برای این پلن موجود نیست.", show_alert=True)
         return
     
-    cursor.execute("SELECT balance FROM wallets WHERE user_id = %s", (user_id,))
+    cursor.execute("SELECT balance FROM wallets WHERE user_id = ?", (user_id,))
     user_wallet = cursor.fetchone()
 
     plan_price = get_plan_price(plan_id, "openvpn")
@@ -1093,18 +1049,31 @@ async def confirm_purchase_openvpn(client, callback_query):
     if user_state and user_state["action"] == f"confirm_purchase_openvpn_{plan_id}":
         plan_price = user_state["plan_price"]
         cursor.execute(
-            "UPDATE wallets SET balance = balance - %s WHERE user_id = %s", (plan_price, user_id))
+            "UPDATE wallets SET balance = balance - ? WHERE user_id = ?", (plan_price, user_id))
         conn.commit()
 
         cursor.execute(
-            "SELECT id, config_text FROM configs WHERE plan_id = %s AND plan_type = 'openvpn' AND status = 'available' LIMIT 1", (plan_id,))
+            "SELECT id, config_text FROM configs WHERE plan_id = ? AND plan_type = 'openvpn' AND status = 'available' LIMIT 1", (plan_id,))
         config_row = cursor.fetchone()
 
         if config_row:
+            cursor.execute(
+                        "SELECT referrer_id FROM referrals WHERE user_id = ?", (user_chat_id,))
+            referrer_id = cursor.fetchone()
+            if referrer_id:
+                referrer_id = referrer_id[0]
+                cursor.execute(
+                            "INSERT OR IGNORE INTO wallets (user_id, balance) VALUES (?, ?)", (referrer_id, 0))
+                cursor.execute(
+                            "UPDATE wallets SET balance = balance + 10000 WHERE user_id = ?", (referrer_id,))
+                conn.commit()
+                await client.send_message(chat_id=referrer_id, text="یک کاربر از زیر مجموعه شما خرید انجام داده است. 10000 تومان به کیف پول شما اضافه شد.")
+
+
             config_id, config_text = config_row
             current_date = datetime.now().strftime('%Y-%m-%d')
 
-            cursor.execute("UPDATE configs SET status = 'sold', chat_id = %s, sale_date = %s WHERE id = %s",(user_id, current_date, config_id))
+            cursor.execute("UPDATE configs SET status = 'sold', chat_id = ?, sale_date = ? WHERE id = ?",(user_id, current_date, config_id))
 
 
             conn.commit()
@@ -1171,7 +1140,7 @@ async def process_buy_config_v2ray(client, callback_query):
 
     cursor.execute("""
         SELECT COUNT(*) FROM configs 
-        WHERE plan_id = %s AND plan_type = 'v2ray' AND status = 'available'
+        WHERE plan_id = ? AND plan_type = 'v2ray' AND status = 'available'
     """, (plan_id,))
     available_count = cursor.fetchone()[0]
 
@@ -1179,7 +1148,7 @@ async def process_buy_config_v2ray(client, callback_query):
         await callback_query.answer("هیچ کانفیگی برای این پلن موجود نیست.", show_alert=True)
         return
 
-    cursor.execute("SELECT balance FROM wallets WHERE user_id = %s", (user_id,))
+    cursor.execute("SELECT balance FROM wallets WHERE user_id = ?", (user_id,))
     user_wallet = cursor.fetchone()
 
     plan_price = get_plan_price(plan_id, "v2ray")
@@ -1215,20 +1184,31 @@ async def confirm_purchase_v2ray(client, callback_query):
         plan_price = user_states[user_id]["plan_price"]
 
         cursor.execute(
-            "UPDATE wallets SET balance = balance - %s WHERE user_id = %s", (plan_price, user_id))
+            "UPDATE wallets SET balance = balance - ? WHERE user_id = ?", (plan_price, user_id))
         conn.commit()
 
         cursor.execute(
-            "SELECT id, config_text FROM configs WHERE plan_id = %s AND plan_type = 'v2ray' AND status = 'available' LIMIT 1",
+            "SELECT id, config_text FROM configs WHERE plan_id = ? AND plan_type = 'v2ray' AND status = 'available' LIMIT 1",
             (plan_id,))
         config_row = cursor.fetchone()
+        cursor.execute(
+                "SELECT referrer_id FROM referrals WHERE user_id = ?", (user_id,))
+        referrer_id = cursor.fetchone()
+        if referrer_id:
+                referrer_id = referrer_id[0]
+                cursor.execute(
+                    "INSERT OR IGNORE INTO wallets (user_id, balance) VALUES (?, ?)", (referrer_id, 0))
+                cursor.execute(
+                    "UPDATE wallets SET balance = balance + 10000 WHERE user_id = ?", (referrer_id,))
+                conn.commit()
+                await client.send_message(chat_id=referrer_id, text="یک کاربر از زیر مجموعه شما خرید انجام داده است. 10000 تومان به کیف پول شما اضافه شد.")
 
         if config_row:
             config_id, config_text = config_row
             
             current_date = datetime.now().strftime('%Y-%m-%d')
 
-            cursor.execute("UPDATE configs SET status = 'sold', chat_id = %s, sale_date = %s WHERE id = %s",(user_id, current_date, config_id))
+            cursor.execute("UPDATE configs SET status = 'sold', chat_id = ?, sale_date = ? WHERE id = ?",(user_id, current_date, config_id))
 
 
             conn.commit()
@@ -1263,10 +1243,10 @@ async def confirm_purchase_v2ray(client, callback_query):
 def get_plan_price(plan_id, plan_type):
     if plan_type == "v2ray":
         cursor.execute(
-            "SELECT price FROM v2ray_plans WHERE id = %s", (plan_id,))
+            "SELECT price FROM v2ray_plans WHERE id = ?", (plan_id,))
     else:
         cursor.execute(
-            "SELECT price FROM openvpn_plans WHERE id = %s", (plan_id,))
+            "SELECT price FROM openvpn_plans WHERE id = ?", (plan_id,))
 
     plan = cursor.fetchone()
     return plan[0] if plan else None
@@ -1318,16 +1298,29 @@ async def approve_openvpn_payment(client, callback_query):
     if(user_chat_id in user_states):
         if admin_id in ADMIN_IDS:
             try:
-                cursor.execute("SELECT id, config_text FROM configs WHERE plan_id = %s AND plan_type = %s AND status = 'available' LIMIT 1",
+                cursor.execute("SELECT id, config_text FROM configs WHERE plan_id = ? AND plan_type = ? AND status = 'available' LIMIT 1",
                             (plan_id, 'openvpn'))
 
                 config_row = cursor.fetchone()
 
                 if config_row:
+                    cursor.execute(
+                        "SELECT referrer_id FROM referrals WHERE user_id = ?", (user_chat_id,))
+                    referrer_id = cursor.fetchone()
+                    if referrer_id:
+                        referrer_id = referrer_id[0]
+                        cursor.execute(
+                            "INSERT OR IGNORE INTO wallets (user_id, balance) VALUES (?, ?)", (referrer_id, 0))
+                        cursor.execute(
+                            "UPDATE wallets SET balance = balance + 10000 WHERE user_id = ?", (referrer_id,))
+                        conn.commit()
+                        await client.send_message(chat_id=referrer_id, text="یک کاربر از زیر مجموعه شما خرید انجام داده است. 10000 تومان به کیف پول شما اضافه شد.")
+
+
                     config_id, config_text = config_row
 
                     current_date = datetime.now().strftime('%Y-%m-%d')
-                    cursor.execute("UPDATE configs SET status = 'sold', chat_id = %s, sale_date = %s WHERE id = %s",(user_chat_id, current_date, config_id))
+                    cursor.execute("UPDATE configs SET status = 'sold', chat_id = ?, sale_date = ? WHERE id = ?",(user_chat_id, current_date, config_id))
 
                     conn.commit()
 
@@ -1360,18 +1353,30 @@ async def approve_v2ray_payment(client, callback_query):
     if(user_chat_id in user_states):
         if admin_id in ADMIN_IDS:
             try:
-                cursor.execute("SELECT id, config_text FROM configs WHERE plan_id = %s AND plan_type = %s AND status = 'available' LIMIT 1",
+                cursor.execute("SELECT id, config_text FROM configs WHERE plan_id = ? AND plan_type = ? AND status = 'available' LIMIT 1",
                             (plan_id, 'v2ray'))
 
                 config_row = cursor.fetchone()
 
                 if config_row:
                     config_id, config_text = config_row
+                    cursor.execute(
+                        "SELECT referrer_id FROM referrals WHERE user_id = ?", (user_chat_id,))
+                    referrer_id = cursor.fetchone()
+                    if referrer_id:
+                        referrer_id = referrer_id[0]
+                        cursor.execute(
+                            "INSERT OR IGNORE INTO wallets (user_id, balance) VALUES (?, ?)", (referrer_id, 0))
+                        cursor.execute(
+                            "UPDATE wallets SET balance = balance + 10000 WHERE user_id = ?", (referrer_id,))
+                        conn.commit()
+                        await client.send_message(chat_id=referrer_id, text="یک کاربر از زیر مجموعه شما خرید انجام داده است. 10000 تومان به کیف پول شما اضافه شد.")
+
 
                     current_date = datetime.now().strftime('%Y-%m-%d')
 
                     cursor.execute(
-                    "UPDATE configs SET status = 'sold', chat_id = %s, sale_date = %s WHERE id = %s",(user_chat_id, current_date, config_id))
+                    "UPDATE configs SET status = 'sold', chat_id = ?, sale_date = ? WHERE id = ?",(user_chat_id, current_date, config_id))
 
                     conn.commit()
 
@@ -1432,9 +1437,9 @@ async def approve_payment(client, callback_query):
         if license:
             license_key = license[0]
             cursor.execute(
-                "INSERT INTO purchases (chat_id, license_key, status, purchase_id) VALUES (%s, %s, 'active', NULL)", (user_chat_id, license_key))
+                "INSERT INTO purchases (chat_id, license_key, status, purchase_id) VALUES (?, ?, 'active', NULL)", (user_chat_id, license_key))
             cursor.execute(
-                "UPDATE licenses SET status = 'sold', purchase_id = last_insert_rowid() WHERE license_key = %s", (license_key,))
+                "UPDATE licenses SET status = 'sold', purchase_id = last_insert_rowid() WHERE license_key = ?", (license_key,))
             conn.commit()
             await client.send_message(user_chat_id, f"پرداخت شما تایید شد✅. کانفیگ شما: {license_key}")
             await send_admin_message(admin_id, f"پرداخت کاربر {user_chat_id} تایید شد. کانفیگ: {license_key}")
@@ -1485,18 +1490,10 @@ async def resend_photo(client, callback_query):
 async def my_configs(client, callback_query):
     chat_id = callback_query.from_user.id
 
-
-    print(chat_id)
-    print('----------------------')
     cursor.execute(
-        "SELECT config_text FROM configs WHERE chat_id = %s", (chat_id,))
-    
-    
+        "SELECT config_text FROM configs WHERE chat_id = ?", (chat_id,))
     purchases = cursor.fetchall()
 
-    if cursor.with_rows:
-        cursor.fetchall()
-        
     if purchases:
         response = "کانفیگ‌های شما:\n"
         for purchase in purchases:
@@ -1543,7 +1540,7 @@ async def handle_document(client, message):
         file_name = message.document.file_name
 
         cursor.execute(
-            "INSERT INTO config_files (file_id, file_name) VALUES (%s, %s)", (file_id, file_name))
+            "INSERT INTO config_files (file_id, file_name) VALUES (?, ?)", (file_id, file_name))
         conn.commit()
 
         await message.reply_text("فایل کانفیگ با موفقیت اضافه شد✅",
@@ -1578,7 +1575,7 @@ async def delete_config(client, callback_query):
     chat_id = callback_query.from_user.id
 
     if chat_id in ADMIN_IDS:
-        cursor.execute("DELETE FROM config_files WHERE id = %s", (config_id,))
+        cursor.execute("DELETE FROM config_files WHERE id = ?", (config_id,))
         conn.commit()
         await callback_query.message.reply_text("فایل کانفیگ با موفقیت حذف شد❌")
     else:
@@ -1590,7 +1587,7 @@ async def download_configs(client, callback_query):
 
     try:
         cursor.execute(
-            "SELECT config_text FROM configs WHERE chat_id = %s and plan_type = 'openvpn'", (chat_id,))
+            "SELECT config_text FROM configs WHERE chat_id = ? and plan_type = 'openvpn'", (chat_id,))
         purchases = cursor.fetchall()
 
         if purchases:
