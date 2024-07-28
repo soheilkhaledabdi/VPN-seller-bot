@@ -203,22 +203,22 @@ async def start(client, message):
     if phone_number and phone_number[0]:
         print('HI')
 
-        # try:
-        #     member = await client.get_chat_member(CHANNEL_ID, chat_id)
-        #     print(member.status)
-        #     print(member.status != 'ChatMemberStatus.MEMBER')
+        try:
+            member = await client.get_chat_member(CHANNEL_ID, chat_id)
+            print(member.status)
+            print(member.status != 'ChatMemberStatus.MEMBER')
             
-        #     if member.status not in [ChatMemberStatus.MEMBER,ChatMemberStatus.OWNER,ChatMemberStatus.ADMINISTRATOR]:
-        #         raise Exception("Not a member")
-        # except:
-        #     keyboard = InlineKeyboardMarkup(
-        #         [[InlineKeyboardButton("عضویت در کانال 📢", url=CHANNEL_LINK)]]
-        #     )
-        #     await message.reply_text(
-        #         "برای استفاده از ربات، باید در کانال ما عضو شوید و دوباره مجدد ربات استارت بزنید",
-        #         reply_markup=keyboard
-        #     )
-        #     return
+            if member.status not in [ChatMemberStatus.MEMBER,ChatMemberStatus.OWNER,ChatMemberStatus.ADMINISTRATOR]:
+                raise Exception("Not a member")
+        except:
+            keyboard = InlineKeyboardMarkup(
+                [[InlineKeyboardButton("عضویت در کانال 📢", url=CHANNEL_LINK)]]
+            )
+            await message.reply_text(
+                "برای استفاده از ربات، باید در کانال ما عضو شوید و دوباره مجدد ربات استارت بزنید",
+                reply_markup=keyboard
+            )
+            return
 
 
         args = message.text.split()
@@ -269,8 +269,8 @@ async def start(client, message):
                                      "پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
                                  [InlineKeyboardButton(
                                      "خرید سرویس گیمینگ 🎮", callback_data="shop_openvpn")],
-                                #  [InlineKeyboardButton(
-                                #      "خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="shop_v2ray")],
+                                 [InlineKeyboardButton(
+                                     "خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="shop_v2ray")],
                                  [InlineKeyboardButton(
                                      "خرید های من 🛍️", callback_data="my_configs")],
                                  [InlineKeyboardButton(
@@ -420,8 +420,8 @@ async def contact(client, message):
                                      "پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
                                  [InlineKeyboardButton(
                                      "خرید سرویس گیمینگ 🎮", callback_data="shop_openvpn")],
-                                #  [InlineKeyboardButton(
-                                #      "خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="shop_v2ray")],
+                                 [InlineKeyboardButton(
+                                     "خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="shop_v2ray")],
                                  [InlineKeyboardButton(
                                      "خرید های من 🛍️", callback_data="my_configs")],
                                  [InlineKeyboardButton(
@@ -461,7 +461,7 @@ async def start(client, callback_query):
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("پروفایل من 👩🏼‍💻🧑🏻‍💻", callback_data="profile")],
                 [InlineKeyboardButton("خرید سرویس گیمینگ 🎮", callback_data="shop_openvpn")],
-                # [InlineKeyboardButton("خرید سرویس V2ray (مناسب برای فضای مجازی) 📲", callback_data="shop_v2ray")],
+                [InlineKeyboardButton("خرید سرویس V2ray (مناسب بر`ای فضای مجازی) 📲", callback_data="shop_v2ray")],
                 [InlineKeyboardButton("خرید های من", callback_data="my_configs")],
                 [InlineKeyboardButton("دانلود کانفیگ های OpenVPN گیمینگ 📥", callback_data="download_configs")],
                 [InlineKeyboardButton(" افزایش موجودی کیف پول 💰", callback_data="add_amount")],
