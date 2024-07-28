@@ -1039,7 +1039,6 @@ async def process_buy_config_open(client, callback_query):
             "action": f"awaiting_admin_approval_openvpn_{plan_id}", "plan_id": plan_id}
 
         await callback_query.message.reply_text("موجودی کیف پول شما کافی نیست.برای خرید کانفیگ به شماره کارت زیر واریز کنید و عکس پرداخت رو ارسال کنید و یا موجودی کیف پول خود را افزایش دهید❤️🙏🏻\n5892-1015-4456-9201\nیزدانی")
-
 @app.on_callback_query(filters.regex(r"confirm_purchase_openvpn_(\d+)"))
 async def confirm_purchase_openvpn(client, callback_query):
     user_id = callback_query.from_user.id
@@ -1048,6 +1047,14 @@ async def confirm_purchase_openvpn(client, callback_query):
 
     if user_state and user_state["action"] == f"confirm_purchase_openvpn_{plan_id}":
         plan_price = user_state["plan_price"]
+
+        cursor.execute("SELECT balance FROM wallets WHERE user_id = ?", (user_id,))
+        current_balance = cursor.fetchone()[0]
+
+        if current_balance < plan_price:
+            await callback_query.answer("موجودی کیف پول شما کافی نیست.❌", show_alert=True)
+            return
+
         cursor.execute(
             "UPDATE wallets SET balance = balance - ? WHERE user_id = ?", (plan_price, user_id))
         conn.commit()
@@ -1058,24 +1065,22 @@ async def confirm_purchase_openvpn(client, callback_query):
 
         if config_row:
             cursor.execute(
-                        "SELECT referrer_id FROM referrals WHERE user_id = ?", (user_chat_id,))
+                "SELECT referrer_id FROM referrals WHERE user_id = ?", (user_id,))
             referrer_id = cursor.fetchone()
+
             if referrer_id:
                 referrer_id = referrer_id[0]
                 cursor.execute(
-                            "INSERT OR IGNORE INTO wallets (user_id, balance) VALUES (?, ?)", (referrer_id, 0))
+                    "INSERT OR IGNORE INTO wallets (user_id, balance) VALUES (?, ?)", (referrer_id, 0))
                 cursor.execute(
-                            "UPDATE wallets SET balance = balance + 10000 WHERE user_id = ?", (referrer_id,))
+                    "UPDATE wallets SET balance = balance + 10000 WHERE user_id = ?", (referrer_id,))
                 conn.commit()
                 await client.send_message(chat_id=referrer_id, text="یک کاربر از زیر مجموعه شما خرید انجام داده است. 10000 تومان به کیف پول شما اضافه شد.")
-
 
             config_id, config_text = config_row
             current_date = datetime.now().strftime('%Y-%m-%d')
 
-            cursor.execute("UPDATE configs SET status = 'sold', chat_id = ?, sale_date = ? WHERE id = ?",(user_id, current_date, config_id))
-
-
+            cursor.execute("UPDATE configs SET status = 'sold', chat_id = ?, sale_date = ? WHERE id = ?", (user_id, current_date, config_id))
             conn.commit()
 
             username, password = config_text.split(',')
@@ -1091,7 +1096,6 @@ async def confirm_purchase_openvpn(client, callback_query):
             await callback_query.message.reply_text("متأسفانه هیچ کانفیگ موجودی برای این پلن وجود ندارد.❌")
     else:
         await callback_query.message.reply_text("تأیید خرید نامعتبر است یا منقضی شده است.❌")
-
 
 @app.on_callback_query(filters.regex("shop_openvpn"))
 async def shop_openvpn(client, callback_query):
@@ -1174,7 +1178,6 @@ async def process_buy_config_v2ray(client, callback_query):
         )
 
 
-
 @app.on_callback_query(filters.regex(r"confirm_purchase_v2ray_(\d+)"))
 async def confirm_purchase_v2ray(client, callback_query):
     user_id = callback_query.from_user.id
@@ -1182,6 +1185,14 @@ async def confirm_purchase_v2ray(client, callback_query):
 
     if user_id in user_states:
         plan_price = user_states[user_id]["plan_price"]
+
+        # Check if user has enough balance
+        cursor.execute("SELECT balance FROM wallets WHERE user_id = ?", (user_id,))
+        current_balance = cursor.fetchone()[0]
+        
+        if current_balance < plan_price:
+            await callback_query.answer("موجودی کیف پول شما کافی نیست.❌", show_alert=True)
+            return
 
         cursor.execute(
             "UPDATE wallets SET balance = balance - ? WHERE user_id = ?", (plan_price, user_id))
@@ -1210,7 +1221,6 @@ async def confirm_purchase_v2ray(client, callback_query):
 
             cursor.execute("UPDATE configs SET status = 'sold', chat_id = ?, sale_date = ? WHERE id = ?",(user_id, current_date, config_id))
 
-
             conn.commit()
 
             qr = qrcode.QRCode(
@@ -1226,7 +1236,6 @@ async def confirm_purchase_v2ray(client, callback_query):
             qr_bytes = io.BytesIO()
             qr_img.save(qr_bytes, format="PNG")
             qr_bytes.seek(0)
-
 
             await client.send_photo(user_id, qr_bytes, caption=f"کانفیگ V2Ray شما:\n`{config_text}`")
 
