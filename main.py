@@ -185,6 +185,7 @@ message_to_delete = None
 
 CHANNEL_ID = -1002210000780
 CHANNEL_LINK = "https://t.me/fifiishop"
+CHECK_JOIN_CHANNEL=False
 
 @app.on_message(filters.command("start") & filters.private)
 async def start(client, message):
@@ -208,7 +209,7 @@ async def start(client, message):
             print(member.status)
             print(member.status != 'ChatMemberStatus.MEMBER')
             
-            if member.status not in [ChatMemberStatus.MEMBER,ChatMemberStatus.OWNER,ChatMemberStatus.ADMINISTRATOR]:
+            if member.status not in [ChatMemberStatus.MEMBER,ChatMemberStatus.OWNER,ChatMemberStatus.ADMINISTRATOR] and CHECK_JOIN_CHANNEL == True:
                 raise Exception("Not a member")
         except:
             keyboard = InlineKeyboardMarkup(
